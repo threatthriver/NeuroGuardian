@@ -4,24 +4,25 @@ from groq import Groq
 from dotenv import load_dotenv
 from datetime import datetime
 
-# Load environment variables
+# Load environment variables (for local development)
 load_dotenv()
 
 class NeuroGuardian:
     def __init__(self):
         """Initialize the wellness companion"""
-        # Validate API key
-        api_key = os.getenv('GROQ_API_KEY')
-        if not api_key:
-            st.error("Please set the GROQ_API_KEY in your environment variables")
-            st.stop()
+        # Get API key from Streamlit secrets (for Streamlit Cloud) or environment variable (for local development)
+        api_key = st.secrets.get("GROQ_API_KEY") if "GROQ_API_KEY" in st.secrets else os.getenv("GROQ_API_KEY")
         
+        if not api_key:
+            st.error("Please set the GROQ_API_KEY in your environment variables or Streamlit Secrets.")
+            st.stop()
+
         # Initialize Groq client
         self.client = Groq(api_key=api_key)
 
         # Configure Streamlit page
         st.set_page_config(
-            page_title="NeuroGuardian",
+            page_title="🧠 NeuroGuardian",
             page_icon="🧠",
             layout="centered"
         )
@@ -71,10 +72,6 @@ class NeuroGuardian:
                 
                 🌐 [Visit IntelliMind Website](#) for more information!
             """)
-            
-            # Add more interactive icons or buttons in the sidebar
-            st.sidebar.subheader("Settings")
-            st.sidebar.write("💬 **Change your nickname or clear chat history.**")
 
             # First-time visitor pop-up with close option
             if not st.session_state.visited:
@@ -84,6 +81,10 @@ class NeuroGuardian:
                     "Start typing below to begin your journey to better mental health!"
                 )
 
+            # Settings section
+            st.sidebar.subheader("Settings")
+            st.sidebar.write("💬 **Change your nickname or clear chat history.**")
+
             # Set or change nickname
             st.session_state.nickname = st.text_input(
                 "Your Nickname", st.session_state.nickname, help="Set your nickname for a more personalized experience"
@@ -91,19 +92,13 @@ class NeuroGuardian:
             if st.session_state.nickname:
                 st.sidebar.write(f"👤 Nickname: {st.session_state.nickname}")
 
-            # Display chat history with timestamps
-            st.sidebar.subheader("📝 Chat History")
-            if "messages" in st.session_state:
-                for message in st.session_state.messages[1:]:
-                    timestamp = message["timestamp"]
-                    st.sidebar.markdown(f"**{message['role'].capitalize()} ({timestamp})**: {message['content']}")
-
             # Clear chat with confirmation
             if st.button("🧹 Clear Chat History"):
                 if st.confirm("Are you sure you want to clear the chat history?"):
                     st.session_state.messages = [
                         {"role": "system", "content": "You are a compassionate doctor and wellness companion. Provide supportive, constructive guidance for mental health and wellness."}
                     ]
+                    st.sidebar.success("Chat history cleared successfully!")
 
         # Initialize session state for messages with a system prompt for doctor role
         if "messages" not in st.session_state:

@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 import streamlit as st
 from groq import Groq
 from datetime import datetime

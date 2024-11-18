@@ -4,13 +4,16 @@ from groq import Groq
 from dotenv import load_dotenv
 from datetime import datetime
 
+# Load environment variables
+load_dotenv()
+
 class NeuroGuardian:
     def __init__(self):
         """Initialize the wellness companion"""
-        # Retrieve the Groq API key from Streamlit secrets
-        api_key = st.secrets.get('GROQ_API_KEY')
+        # Validate API key
+        api_key = os.getenv('GROQ_API_KEY')
         if not api_key:
-            st.error("Please set the GROQ_API_KEY in Streamlit Secrets")
+            st.error("Please set the GROQ_API_KEY in your environment variables")
             st.stop()
         
         # Initialize Groq client

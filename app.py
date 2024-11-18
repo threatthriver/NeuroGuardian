@@ -97,18 +97,28 @@ class NeuroGuardian:
                 for message in st.session_state.messages[1:]:
                     st.sidebar.markdown(f"**{message['role'].capitalize()}**: {message['content']}")
 
-            # Clear chat with confirmation
+            # Clear chat with button interaction
             if st.button("🧹 Clear Chat History"):
-                if st.confirm("Are you sure you want to clear the chat history?"):
+                confirm_clear = st.radio("Are you sure you want to clear the chat history?", ("Yes", "No"))
+                if confirm_clear == "Yes":
                     st.session_state.messages = [
                         {"role": "system", "content": "You are a compassionate doctor and wellness companion. Provide supportive, constructive guidance for mental health and wellness."}
                     ]
+                    st.success("Chat history cleared successfully!")
+                elif confirm_clear == "No":
+                    st.info("Your chat history is safe.")
 
         # Initialize session state for messages with a system prompt for doctor role
         if "messages" not in st.session_state:
             st.session_state.messages = [
                 {"role": "system", "content": "You are a compassionate doctor and wellness companion. Provide supportive, constructive guidance for mental health and wellness."}
             ]
+
+        # Greet the user based on their nickname or a general greeting
+        if st.session_state.nickname:
+            st.write(f"👋 Hello, {st.session_state.nickname}! How can I assist you today?")
+        else:
+            st.write("👋 Hello! How can I support you today?")
 
         # Display chat messages with no timestamps, only the message content
         for message in st.session_state.messages[1:]:

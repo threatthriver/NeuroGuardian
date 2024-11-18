@@ -91,12 +91,11 @@ class NeuroGuardian:
             if st.session_state.nickname:
                 st.sidebar.write(f"👤 Nickname: {st.session_state.nickname}")
 
-            # Display chat history with timestamps
+            # Display chat history without timestamps
             st.sidebar.subheader("📝 Chat History")
             if "messages" in st.session_state:
                 for message in st.session_state.messages[1:]:
-                    timestamp = message["timestamp"]
-                    st.sidebar.markdown(f"**{message['role'].capitalize()} ({timestamp})**: {message['content']}")
+                    st.sidebar.markdown(f"**{message['role'].capitalize()}**: {message['content']}")
 
             # Clear chat with confirmation
             if st.button("🧹 Clear Chat History"):
@@ -111,19 +110,17 @@ class NeuroGuardian:
                 {"role": "system", "content": "You are a compassionate doctor and wellness companion. Provide supportive, constructive guidance for mental health and wellness."}
             ]
 
-        # Display chat messages with timestamps
+        # Display chat messages with no timestamps, only the message content
         for message in st.session_state.messages[1:]:
             with st.chat_message(message["role"]):
-                st.markdown(f"**{message['role'].capitalize()}**: {message['content']} - *{message['timestamp']}*")
+                st.markdown(f"**{message['role'].capitalize()}**: {message['content']}")
 
         # User input for chat
         if prompt := st.chat_input("How can I support you today?"):
-            # Add user message to chat history with timestamp (converted to string)
-            timestamp = datetime.now().strftime("%H:%M:%S")
+            # Add user message to chat history without timestamp
             st.session_state.messages.append({
                 "role": "user", 
-                "content": prompt,
-                "timestamp": timestamp
+                "content": prompt
             })
             
             # Display user message
@@ -135,11 +132,10 @@ class NeuroGuardian:
                 ai_response = self.generate_ai_response(st.session_state.messages)
                 st.markdown(ai_response)
             
-            # Add AI response to chat history with timestamp (converted to string)
+            # Add AI response to chat history without timestamp
             st.session_state.messages.append({
                 "role": "assistant", 
-                "content": ai_response,
-                "timestamp": timestamp
+                "content": ai_response
             })
 
 def main():

@@ -1,21 +1,18 @@
-import os
 import streamlit as st
 from groq import Groq
-from dotenv import load_dotenv
 from datetime import datetime
 
-# Load environment variables
-load_dotenv()
+# Retrieve the API key from Streamlit secrets
+api_key = st.secrets.get("GROQ_API_KEY")
+
+# Ensure the API key is available
+if not api_key:
+    st.error("Please set the GROQ_API_KEY in your Streamlit secrets.")
+    st.stop()
 
 class NeuroGuardian:
     def __init__(self):
         """Initialize the wellness companion"""
-        # Validate API key
-        api_key = os.getenv('GROQ_API_KEY')
-        if not api_key:
-            st.error("Please set the GROQ_API_KEY in your environment variables")
-            st.stop()
-        
         # Initialize Groq client
         self.client = Groq(api_key=api_key)
 
@@ -95,15 +92,17 @@ class NeuroGuardian:
             st.sidebar.subheader("📝 Chat History")
             if "messages" in st.session_state:
                 for message in st.session_state.messages[1:]:
-                    timestamp = message["timestamp"]
+                    timestamp = message.get("timestamp", "N/A")
                     st.sidebar.markdown(f"**{message['role'].capitalize()} ({timestamp})**: {message['content']}")
 
             # Clear chat with confirmation
-            if st.button("🧹 Clear Chat History"):
-                if st.confirm("Are you sure you want to clear the chat history?"):
-                    st.session_state.messages = [
-                        {"role": "system", "content": "You are a compassionate doctor and wellness companion. Provide supportive, constructive guidance for mental health and wellness."}
-                    ]
+            if st.sidebar.button("🧹 Clear Chat History"):
+                if st.session_state.messages:
+                    confirm = st.sidebar.radio("Are you sure you want to clear the chat history?", ("Yes", "No"))
+                    if confirm == "Yes":
+                        st.session_state.messages = [
+                            {"role": "system", "content": "You are a compassionate doctor and wellness companion. Provide supportive, constructive guidance for mental health and wellness."}
+                        ]
 
         # Initialize session state for messages with a system prompt for doctor role
         if "messages" not in st.session_state:

@@ -1,7 +1,7 @@
 import os
-from dotenv import load_dotenv
 import streamlit as st
 from groq import Groq
+from dotenv import load_dotenv
 from datetime import datetime
 
 # Load environment variables
@@ -21,7 +21,7 @@ class NeuroGuardian:
 
         # Configure Streamlit page
         st.set_page_config(
-            page_title="🧠 NeuroGuardian",
+            page_title="NeuroGuardian | IntelliMind",
             page_icon="🧠",
             layout="centered"
         )
@@ -56,7 +56,7 @@ class NeuroGuardian:
 
     def run(self):
         """Main application runner"""
-        st.title("🧠 NeuroGuardian")
+        st.title("🧠 NeuroGuardian | IntelliMind")
         st.caption("Your Wellness Companion")
 
         # Sidebar for user settings and IntelliMind information
@@ -69,8 +69,12 @@ class NeuroGuardian:
                 - 🌱 **Personalized Care**: Tailored to your unique needs and emotional state.
                 - ⚙️ **Innovative AI**: Powered by the latest in artificial intelligence for seamless interactions.
                 
-                🌐 [Visit IntelliMind Website](#) for more information!
+                🌐 [Visit IntelliMind Website](https://intellimind.com) for more information!
             """)
+            
+            # Add more interactive icons or buttons in the sidebar
+            st.sidebar.subheader("Settings")
+            st.sidebar.write("💬 **Change your nickname or clear chat history.**")
 
             # First-time visitor pop-up with close option
             if not st.session_state.visited:
@@ -79,10 +83,6 @@ class NeuroGuardian:
                     "Welcome to NeuroGuardian! Your AI wellness companion.\n"
                     "Start typing below to begin your journey to better mental health!"
                 )
-
-            # Settings section
-            st.sidebar.subheader("Settings")
-            st.sidebar.write("💬 **Change your nickname or clear chat history.**")
 
             # Set or change nickname
             st.session_state.nickname = st.text_input(

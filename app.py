@@ -1,22 +1,19 @@
-import os
 import streamlit as st
 from groq import Groq
-from dotenv import load_dotenv
 from datetime import datetime
 
-# Load environment variables (for local development)
+# Load environment variables
 load_dotenv()
 
 class NeuroGuardian:
     def __init__(self):
         """Initialize the wellness companion"""
-        # Get API key from Streamlit secrets (for Streamlit Cloud) or environment variable (for local development)
-        api_key = st.secrets.get("GROQ_API_KEY") if "GROQ_API_KEY" in st.secrets else os.getenv("GROQ_API_KEY")
-        
+        # Validate API key
+        api_key = os.getenv('GROQ_API_KEY')
         if not api_key:
-            st.error("Please set the GROQ_API_KEY in your environment variables or Streamlit Secrets.")
+            st.error("Please set the GROQ_API_KEY in your environment variables")
             st.stop()
-
+        
         # Initialize Groq client
         self.client = Groq(api_key=api_key)
 
@@ -92,13 +89,19 @@ class NeuroGuardian:
             if st.session_state.nickname:
                 st.sidebar.write(f"👤 Nickname: {st.session_state.nickname}")
 
+            # Display chat history with timestamps
+            st.sidebar.subheader("📝 Chat History")
+            if "messages" in st.session_state:
+                for message in st.session_state.messages[1:]:
+                    timestamp = message["timestamp"]
+                    st.sidebar.markdown(f"**{message['role'].capitalize()} ({timestamp})**: {message['content']}")
+
             # Clear chat with confirmation
             if st.button("🧹 Clear Chat History"):
                 if st.confirm("Are you sure you want to clear the chat history?"):
                     st.session_state.messages = [
                         {"role": "system", "content": "You are a compassionate doctor and wellness companion. Provide supportive, constructive guidance for mental health and wellness."}
                     ]
-                    st.sidebar.success("Chat history cleared successfully!")
 
         # Initialize session state for messages with a system prompt for doctor role
         if "messages" not in st.session_state:

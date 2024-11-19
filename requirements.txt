@@ -1,4 +1,5 @@
 streamlit
 groq
 python-dotenv
-datetime
+beautifulsoup4
+requests

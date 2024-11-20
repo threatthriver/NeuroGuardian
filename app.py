@@ -1,161 +1,260 @@
 import os
-import logging
+import uuid
 import streamlit as st
+from groq import Groq, RateLimitError, APIError
 from dotenv import load_dotenv
-from groq import Groq
-from datetime import datetime
-from PIL import Image
-import io
+import pandas as pd
+import requests
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
 
-# Get the API key from the environment
-API_KEY = os.getenv("GROQ_API_KEY")
+# Configuration and Setup
+st.set_page_config(
+    page_title="MediAssist AI",
+    page_icon="🩺",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# Ensure the API key is set
-if not API_KEY:
-    raise ValueError("API_KEY is not set in the .env file")
+# Enhanced Custom CSS with Dark Mode Support and Improved Color Palette
+st.markdown("""
+<style>
+    body {
+        background-color: #1e212d; /* Sophisticated dark background */
+        color: #dfe6e9; /* Light gray text for readability */
+        font-family: 'Inter', sans-serif;
+        transition: background-color 0.3s ease, color 0.3s ease;
+    }
 
-# Constants
-MODEL_NAME = "llama-3.2-11b-vision-preview"
-TEMPERATURE = 1
-MAX_TOKENS = 1024
-TOP_P = 1
+    .main-header {
+        background: linear-gradient(135deg, #2a3042 0%, #3e4558 100%); /* Subtle gradient for header */
+        color: #dfe6e9;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
 
-# Function to create the Groq client
-def create_groq_client(api_key):
-    try:
-        client = Groq(api_key=api_key)
-        return client
-    except Exception as e:
-        logger.error(f"Failed to create Groq client: {e}")
-        raise
+    .sidebar .sidebar-content {
+        background-color: #2a3042; /* Darker sidebar for contrast */
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        color: #dfe6e9;
+    }
 
-# Function to handle chat completions
-def get_completion(messages):
-    try:
-        client = create_groq_client(API_KEY)
+    .stContainer {
+        background-color: #2a3042; /* Darker container for content */
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        color: #dfe6e9;
+    }
 
-        # Create the chat completion
-        completion = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=messages,
-            temperature=TEMPERATURE,
-            max_tokens=MAX_TOKENS,
-            top_p=TOP_P,
-            stream=False,
-            stop=None,
-        )
+    .stButton>button {
+        background-color: #4285f4; /* Google blue for buttons */
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 10px 20px;
+        transition: all 0.3s ease;
+    }
+    .stButton>button:hover {
+        background-color: #3273dc; /* Darker blue on hover */
+        transform: translateY(-2px);
+    }
 
-        try:
-            return completion.choices[0].message.content
-        except (AttributeError, IndexError) as e:
-            logger.error(f"Error accessing response data: {e}")
-            return "Sorry, there was an error processing your request."
+    .user-message {
+        background-color: #3e4558; /* User message background */
+        border-left: 4px solid #4285f4; /* Google blue border */
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+        color: #dfe6e9;
+    }
+    .ai-message {
+        background-color: #2a3042; /* AI message background */
+        border-left: 4px solid #a5d6a7; /* Green border for AI messages */
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+        color: #dfe6e9;
+    }
 
-    except Exception as e:
-        logger.error(f"Error during completion request: {e}")
-        return "An error occurred while processing your request. Please try again later."
-
-# Function to save feedback
-def save_feedback(feedback, conversation):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open("feedback.txt", "a") as f:
-        f.write(f"[{timestamp}] Feedback: {feedback}\nConversation:\n")
-        for msg in conversation:
-            f.write(f"{msg['role']}: {msg['content']}\n")
-        f.write("\n" + "-"*50 + "\n")
-    logger.info("Feedback saved successfully.")
-
-# Function to process uploaded image
-def process_image(image_file):
-    try:
-        # Open the image with PIL
-        image = Image.open(image_file)
-
-        # Optional: Convert image to another format (like RGB) for further processing
-        image = image.convert("RGB")
-        
-        # Here, we would typically send the image to the model. For now, we simulate it.
-        image_message = {
-            "role": "user",
-            "content": "What does this medical image show?"
+    /* Media query for dark mode */
+    @media (prefers-color-scheme: dark) {
+        body {
+            background-color: #1e212d; /* Consistent dark background */
+            color: #dfe6e9; /* Consistent light text */
         }
-        return image_message
-    except Exception as e:
-        logger.error(f"Error processing the image: {e}")
-        return None
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# Streamlit interface
+class MedicalAIChatbot:
+    def __init__(self):
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            st.error("API key not found. Please set GROQ_API_KEY in your .env file.")
+            raise EnvironmentError("API key not found.")
+        self.client = Groq(api_key=api_key)
+        self.system_prompt = """You are MediAssist, an advanced AI medical companion designed to:
+        - Provide comprehensive, evidence-based medical insights
+        - Support healthcare professionals with clinical reasoning
+        - Explain medical concepts clearly and precisely
+
+        Key Principles:
+        1. Clarify that you are an AI assistant, not a substitute for professional medical advice
+        2. Use clear and empathetic language
+        3. Simplify complex medical information
+        4. Prioritize patient safety and understanding
+        5. Recommend professional consultation when necessary
+
+        Communication Style:
+        - Be precise and scientific
+        - Use medical terminology with clear explanations
+        - Provide balanced, objective information
+        - Maintain a supportive and professional tone"""
+
+    def generate_response(self, messages: list) -> str:
+        try:
+            full_messages = [{"role": "system", "content": self.system_prompt}] + messages
+            with st.spinner("Generating response..."):
+                completion = self.client.chat.completions.create(
+                    model="llama-3.2-11b-vision-preview",  # Updated model name
+                    messages=full_messages,
+                    temperature=1,
+                    max_tokens=1024,
+                    top_p=1,
+                    stream=False,
+                )
+            return completion.choices[0].message.content.strip()
+        except RateLimitError:
+            st.error("Too many requests. Please wait and try again.")
+            return "I'm experiencing high traffic. Please try again later."
+        except Exception as e:  # Catching all exceptions instead of specific ones
+            if isinstance(e, requests.Timeout):
+                st.error("The request timed out. Please try again later.")
+                return "I'm having trouble connecting. Please check your internet connection."
+            elif isinstance(e, APIError):
+                st.error(f"An error occurred with the Groq API: {e}")
+                return "I apologize, but there was an issue processing your request."
+            else:
+                st.error(f"An unexpected error occurred: {e}")
+                return "An unexpected error occurred. Please try again later."
+
+class PatientRecordManager:
+    @staticmethod
+    def create_patient_record(name: str, age: int, medical_history: str, conditions: str, medications: str) -> str:
+        patient_id = str(uuid.uuid4())[:8]
+        record = {
+            "id": patient_id,
+            "name": name,
+            "age": age,
+            "medical_history": medical_history,
+            "current_conditions": conditions,
+            "current_medications": medications,
+            "consultations": []
+        }
+        if "patient_records" not in st.session_state:
+            st.session_state.patient_records = {}
+        st.session_state.patient_records[patient_id] = record
+        return patient_id
+
+def display_message(role: str, content: str):
+    role_class = "user-message" if role == "user" else "ai-message"
+    avatar = "🧑‍⚕️" if role == "user" else "🤖"
+    with st.chat_message(role, avatar=avatar):
+        st.markdown(f'<div class="{role_class}">{content}</div>', unsafe_allow_html=True)
+
+def chat_page(chatbot: MedicalAIChatbot):
+    st.subheader("Medical Consultation Chat")
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    for message in st.session_state.chat_history:
+        display_message(message["role"], message["content"])
+
+    user_input = st.chat_input("Ask a medical question or describe symptoms...")
+    if user_input:
+        st.session_state.chat_history.append({"role": "user", "content": user_input})
+        display_message("user", user_input)
+        ai_response = chatbot.generate_response(st.session_state.chat_history)
+        st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
+        display_message("assistant", ai_response)
+    if st.button("Clear Chat"):
+        st.session_state.chat_history = []
+        st.rerun()
+
+def patient_records_page():
+    st.subheader("Manage Patient Records")
+    if "patient_records" not in st.session_state:
+        st.session_state.patient_records = {}
+
+    form = st.form(key="patient_form")
+    name = form.text_input("Patient Name")
+    age = form.number_input("Age", min_value=1)
+    medical_history = form.text_area("Medical History")
+    conditions = form.text_area("Current Conditions")
+    medications = form.text_area("Current Medications")
+    submit = form.form_submit_button("Save Record")
+
+    if submit:
+        PatientRecordManager.create_patient_record(name, age, medical_history, conditions, medications)
+        st.success("Patient record saved successfully!")
+
+    if st.session_state.patient_records:
+        for pid, record in st.session_state.patient_records.items():
+            with st.expander(record["name"]):
+                st.write(f"Age: {record['age']}")
+                st.write(f"Medical History: {record['medical_history']}")
+                st.write(f"Conditions: {record['current_conditions']}")
+                st.write(f"Medications: {record['current_medications']}")
+
+def medical_dashboard():
+    st.subheader("Medical Dashboard")
+    data = {
+        "Total Patients": len(st.session_state.patient_records) if "patient_records" in st.session_state else 0,
+        "Consultations Today": 0,  # Placeholder for future implementation
+        "Cases Resolved": 0,  # Placeholder for future implementation
+    }
+    st.write(pd.DataFrame(list(data.items()), columns=["Metric", "Value"]))
+
 def main():
-    st.title("NeuroGuardian - Beta")
-    
-    # Display instructions
-    st.write("Welcome to the medical AI assistant. Ask your questions or upload medical images.")
-    
-    # Upload medical image (optional)
-    image = st.file_uploader("Upload an X-ray or Medical Image", type=["jpg", "png", "jpeg"])
-    
-    if image:
-        # Display the uploaded image
-        st.image(image, caption="Uploaded Image", use_column_width=True)
-        st.write("Processing image...")
+    st.markdown('<div class="main-header"><h1>🩺 MediAssist AI: Your Medical Companion</h1></div>', unsafe_allow_html=True)
 
-        # Process the image
-        image_message = process_image(image)
+    page_options = {
+        "Chat Assistant": "💬",
+        "Patient Records": "📋",
+        "Medical Dashboard": "📊"
+    }
 
-        if image_message:
-            # Simulate sending the image to the model and getting a response
-            response = get_completion([image_message])
-            st.write(response)
-        else:
-            st.error("There was an error processing the image. Please try again.")
+    page_labels = list(page_options.keys())
+    page_icons = [f'<span style="font-size:20px; margin-right:5px;">{icon}</span>{label}' for label, icon in page_options.items()]
 
-    # Chat functionality
-    if 'messages' not in st.session_state:
-        st.session_state['messages'] = [
-            {"role": "system", "content": "You are a medical AI assistant."}
-        ]
-    
-    user_input = st.text_input("Ask a medical question:")
+    selected_page = st.sidebar.selectbox(
+        "Navigation", page_icons, format_func=lambda x: x
+    )
 
-    if st.button("Send"):
-        if user_input:
-            # Add user message to the conversation
-            st.session_state['messages'].append({"role": "user", "content": user_input})
-            st.write("Processing your question...")  # Feedback message for the user
+    page_name = selected_page.split('</span>', 1)[1].strip()
 
-            try:
-                # Get the response from the AI model
-                ai_response = get_completion(st.session_state['messages'])
-                
-                # Display the AI response
-                st.session_state['messages'].append({"role": "assistant", "content": ai_response})
+    st.sidebar.markdown('<div class="sidebar-content"><h2>MediAssist AI</h2></div>', unsafe_allow_html=True)
 
-                # Display chat messages
-                for msg in st.session_state['messages']:
-                    st.chat_message(msg['content'], is_user=msg['role'] == 'user')
-            
-            except Exception as e:
-                st.error("There was an issue getting the response. Please try again.")
-        
-            # After the conversation ends, show the feedback section
-            st.write("### Your Feedback Matters!")
-            feedback = st.text_area("Please share your feedback about the assistant:")
-            
-            if st.button("Submit Feedback"):
-                if feedback:
-                    try:
-                        save_feedback(feedback, st.session_state['messages'])  # Save feedback with conversation context
-                        st.success("Thank you for your feedback!")
-                        st.session_state['messages'] = []  # Clear chat history after feedback submission
-                    except Exception as e:
-                        st.error("There was an issue submitting your feedback. Please try again.")
+    if page_name == "Chat Assistant":
+        st.markdown('<div class="stContainer">', unsafe_allow_html=True)
+        chat_page(MedicalAIChatbot())
+        st.markdown('</div>', unsafe_allow_html=True)
+    elif page_name == "Patient Records":
+        st.markdown('<div class="stContainer">', unsafe_allow_html=True)
+        patient_records_page()
+        st.markdown('</div>', unsafe_allow_html=True)
+    elif page_name == "Medical Dashboard":
+        st.markdown('<div class="stContainer">', unsafe_allow_html=True)
+        medical_dashboard()
+        st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()

@@ -1,5 +1,4 @@
-streamlit
 groq
+streamlit
+streamlit-chat
 python-dotenv
-beautifulsoup4
-requests

@@ -377,6 +377,8 @@ def chat_page(chatbot: MedicalAIChatbot) -> None:
             st.session_state.chat_history = []
         if "feedback" not in st.session_state:
             st.session_state.feedback = {}
+        if "confirm_clear" not in st.session_state:
+            st.session_state.confirm_clear = False
         
         # Patient selection
         selected_patient = None
@@ -413,15 +415,22 @@ def chat_page(chatbot: MedicalAIChatbot) -> None:
             })
             display_message("assistant", ai_response, message_id)
         
-        # Clear chat button with confirmation
-        if st.button("Clear Chat"):
-            if st.session_state.chat_history:
-                if st.button("Confirm Clear Chat"):
+        # Clear chat button with improved confirmation
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("Clear Chat", type="primary", disabled=not st.session_state.chat_history):
+                st.session_state.confirm_clear = True
+        
+        with col2:
+            if st.session_state.confirm_clear:
+                st.warning("Are you sure you want to clear the chat history?")
+                if st.button("Yes, Clear Chat", type="primary"):
                     st.session_state.chat_history = []
+                    st.session_state.confirm_clear = False
                     st.rerun()
-            else:
-                st.session_state.chat_history = []
-                st.rerun()
+                if st.button("Cancel"):
+                    st.session_state.confirm_clear = False
+                    st.rerun()
 
         # Feedback system in sidebar
         with st.sidebar:

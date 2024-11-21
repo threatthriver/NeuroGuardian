@@ -161,8 +161,13 @@ class MedicalAIChatbot:
                 st.error("The request timed out. Please try again later.")
                 return "I'm having trouble connecting. Please check your internet connection."
             elif isinstance(e, APIError):
-                st.error(f"An error occurred with the Groq API: {e}")
-                return "I apologize, but there was an issue processing your request."
+                error_message = str(e)
+                if "invalid_request_error" in error_message:
+                    st.error(f"An error occurred with the Groq API: Error code: 400 - {error_message}")
+                    return "There was an issue with the request. Please check the input and try again."
+                else:
+                    st.error(f"An error occurred with the Groq API: {e}")
+                    return "I apologize, but there was an issue processing your request."
             else:
                 st.error(f"An unexpected error occurred: {e}")
                 return "An unexpected error occurred. Please try again later."

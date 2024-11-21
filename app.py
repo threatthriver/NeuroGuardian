@@ -648,10 +648,6 @@ def main() -> None:
         st.markdown('<div class="main-header"><h1>🧠 NeuroGuardian: Advanced Medical AI Assistant</h1></div>', 
                    unsafe_allow_html=True)
 
-        # Initialize doctor login
-        if "doctor_id" not in st.session_state:
-            st.session_state.doctor_id = str(uuid.uuid4())[:8]  # Generate temporary doctor ID
-
         pages = ["Chat Assistant", "Patient Records", "Medical Dashboard"]
         selected_page = st.sidebar.selectbox("Navigation", pages)
 
@@ -682,7 +678,7 @@ def main() -> None:
         # Route to selected page
         if selected_page == "Chat Assistant":
             st.markdown('<div class="stContainer">', unsafe_allow_html=True)
-            chat_page(MedicalAIChatbot(), st.session_state.doctor_id)
+            chat_page(MedicalAIChatbot())
             st.markdown('</div>', unsafe_allow_html=True)
         elif selected_page == "Patient Records":
             st.markdown('<div class="stContainer">', unsafe_allow_html=True)

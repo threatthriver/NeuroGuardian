@@ -10,6 +10,7 @@ import json
 import csv
 from pathlib import Path
 from cryptography.fernet import Fernet
+import io
 
 # Load environment variables
 load_dotenv()
@@ -202,22 +203,51 @@ class PatientRecordManager:
     @staticmethod
     def import_from_csv(file):
         try:
-            df = pd.read_csv(file)
+            # Read CSV file content
+            content = file.read().decode('utf-8')
+            csv_data = csv.DictReader(io.StringIO(content))
+            
+            required_fields = ["name", "age", "medical_history", "current_conditions", "current_medications"]
+            
+            # Validate CSV structure
+            headers = csv_data.fieldnames
+            if not headers or not all(field in headers for field in required_fields):
+                st.error("Invalid CSV format. Required columns: name, age, medical_history, current_conditions, current_medications")
+                return None
+            
             records = {}
-            for _, row in df.iterrows():
-                patient_id = str(uuid.uuid4())[:8]
-                records[patient_id] = {
-                    "id": patient_id,
-                    "name": row["name"],
-                    "age": int(row["age"]),
-                    "medical_history": row["medical_history"],
-                    "current_conditions": row["current_conditions"],
-                    "current_medications": row["current_medications"],
-                    "consultations": []
-                }
+            for row in csv_data:
+                try:
+                    # Validate data types and required fields
+                    if not row["name"].strip():
+                        continue
+                    
+                    age = int(row["age"])
+                    if age <= 0:
+                        continue
+                        
+                    patient_id = str(uuid.uuid4())[:8]
+                    records[patient_id] = {
+                        "id": patient_id,
+                        "name": row["name"].strip(),
+                        "age": age,
+                        "medical_history": row["medical_history"].strip(),
+                        "current_conditions": row["current_conditions"].strip(),
+                        "current_medications": row["current_medications"].strip(),
+                        "consultations": []
+                    }
+                except (ValueError, KeyError) as e:
+                    st.warning(f"Skipping invalid record: {row.get('name', 'Unknown')}. Error: {str(e)}")
+                    continue
+                    
+            if not records:
+                st.error("No valid records found in the CSV file")
+                return None
+                
             return records
+            
         except Exception as e:
-            st.error("Error importing CSV file. Please check the format.")
+            st.error(f"Error importing CSV file: {str(e)}")
             return None
 
     @staticmethod
@@ -316,14 +346,25 @@ def patient_records_page():
 
     # Import patient records from CSV
     st.markdown("### Import Patient Records")
+    st.markdown("""
+    Upload a CSV file with the following columns:
+    - name (required)
+    - age (required, must be positive number)
+    - medical_history
+    - current_conditions
+    - current_medications
+    """)
+    
     uploaded_file = st.file_uploader("Upload CSV file with patient records", type="csv")
     if uploaded_file is not None:
         if st.button("Import Records"):
-            imported_records = PatientRecordManager.import_from_csv(uploaded_file)
-            if imported_records:
-                st.session_state.patient_records.update(imported_records)
-                PatientRecordManager.save_to_file(st.session_state.patient_records)
-                st.success("Patient records imported successfully!")
+            with st.spinner("Importing records..."):
+                imported_records = PatientRecordManager.import_from_csv(uploaded_file)
+                if imported_records:
+                    st.session_state.patient_records.update(imported_records)
+                    PatientRecordManager.save_to_file(st.session_state.patient_records)
+                    st.success(f"Successfully imported {len(imported_records)} patient records!")
+                    st.rerun()
 
     st.markdown("### Add New Patient")
     form = st.form(key="patient_form")

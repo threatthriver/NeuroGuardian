@@ -22,14 +22,14 @@ st.set_page_config(
 st.markdown("""
 <style>
     body {
-        background-color: #1e212d; /* Sophisticated dark background */
-        color: #dfe6e9; /* Light gray text for readability */
+        background-color: #1e212d;
+        color: #dfe6e9;
         font-family: 'Inter', sans-serif;
         transition: background-color 0.3s ease, color 0.3s ease;
     }
 
     .main-header {
-        background: linear-gradient(135deg, #2a3042 0%, #3e4558 100%); /* Subtle gradient for header */
+        background: linear-gradient(135deg, #2a3042 0%, #3e4558 100%);
         color: #dfe6e9;
         padding: 20px;
         border-radius: 10px;
@@ -39,7 +39,7 @@ st.markdown("""
     }
 
     .sidebar .sidebar-content {
-        background-color: #2a3042; /* Darker sidebar for contrast */
+        background-color: #2a3042;
         border-radius: 10px;
         padding: 20px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
@@ -47,7 +47,7 @@ st.markdown("""
     }
 
     .stContainer {
-        background-color: #2a3042; /* Darker container for content */
+        background-color: #2a3042;
         border-radius: 10px;
         padding: 20px;
         margin-bottom: 20px;
@@ -56,7 +56,7 @@ st.markdown("""
     }
 
     .stButton > button {
-        background-color: #4285f4; /* Google blue for buttons */
+        background-color: #4285f4;
         color: white;
         border: none;
         border-radius: 6px;
@@ -65,13 +65,13 @@ st.markdown("""
     }
 
     .stButton > button:hover {
-        background-color: #3273dc; /* Darker blue on hover */
+        background-color: #3273dc;
         transform: translateY(-2px);
     }
 
     .user-message {
-        background-color: #3e4558; /* User message background */
-        border-left: 4px solid #4285f4; /* Google blue border */
+        background-color: #3e4558;
+        border-left: 4px solid #4285f4;
         padding: 10px;
         margin-bottom: 10px;
         border-radius: 5px;
@@ -79,8 +79,8 @@ st.markdown("""
     }
 
     .ai-message {
-        background-color: #2a3042; /* AI message background */
-        border-left: 4px solid #a5d6a7; /* Green border for AI messages */
+        background-color: #2a3042;
+        border-left: 4px solid #a5d6a7;
         padding: 10px;
         margin-bottom: 10px;
         border-radius: 5px;
@@ -100,11 +100,10 @@ st.markdown("""
         margin-top: 5px;
     }
 
-    /* Media query for dark mode */
     @media (prefers-color-scheme: dark) {
         body {
-            background-color: #1e212d; /* Consistent dark background */
-            color: #dfe6e9; /* Consistent light text */
+            background-color: #1e212d;
+            color: #dfe6e9;
         }
     }
 </style>
@@ -142,7 +141,17 @@ class MedicalAIChatbot:
             if patient_data:
                 context += f"\nPatient Context:\nName: {patient_data['name']}\nAge: {patient_data['age']}\nMedical History: {patient_data['medical_history']}\nCurrent Conditions: {patient_data['current_conditions']}\nMedications: {patient_data['current_medications']}"
             
-            full_messages = [{"role": "system", "content": context}] + messages
+            # Remove id from messages before sending to API
+            cleaned_messages = []
+            for msg in messages:
+                cleaned_msg = {
+                    "role": msg["role"],
+                    "content": msg["content"]
+                }
+                cleaned_messages.append(cleaned_msg)
+            
+            full_messages = [{"role": "system", "content": context}] + cleaned_messages
+            
             with st.spinner("Generating response..."):
                 completion = self.client.chat.completions.create(
                     model="llama-3.2-11b-vision-preview",
@@ -161,15 +170,10 @@ class MedicalAIChatbot:
                 st.error("The request timed out. Please try again later.")
                 return "I'm having trouble connecting. Please check your internet connection."
             elif isinstance(e, APIError):
-                error_message = str(e)
-                if "invalid_request_error" in error_message:
-                    st.error(f"An error occurred with the Groq API: Error code: 400 - {error_message}")
-                    return "There was an issue with the request. Please check the input and try again."
-                else:
-                    st.error(f"An error occurred with the Groq API: {e}")
-                    return "I apologize, but there was an issue processing your request."
+                st.error("An error occurred with the API. Please try again later.")
+                return "I apologize, but there was an issue processing your request."
             else:
-                st.error(f"An unexpected error occurred: {e}")
+                st.error("An unexpected error occurred. Please try again later.")
                 return "An unexpected error occurred. Please try again later."
 
 class PatientRecordManager:
@@ -195,36 +199,6 @@ def display_message(role: str, content: str, message_id: str = None):
     avatar = "🧑‍⚕️" if role == "user" else "🤖"
     with st.chat_message(role, avatar=avatar):
         st.markdown(f'<div class="{role_class}">{content}</div>', unsafe_allow_html=True)
-        
-        if role == "assistant" and message_id:
-            with st.container():
-                st.markdown('<div class="feedback-container">', unsafe_allow_html=True)
-                col1, col2, col3 = st.columns([1,1,2])
-                
-                with col1:
-                    if st.button("👍", key=f"helpful_{message_id}"):
-                        if "feedback" not in st.session_state:
-                            st.session_state.feedback = {}
-                        st.session_state.feedback[message_id] = {
-                            "rating": "helpful",
-                            "timestamp": datetime.now().isoformat()
-                        }
-                        st.success("Thank you for your feedback!")
-                
-                with col2:
-                    if st.button("👎", key=f"not_helpful_{message_id}"):
-                        if "feedback" not in st.session_state:
-                            st.session_state.feedback = {}
-                        st.session_state.feedback[message_id] = {
-                            "rating": "not_helpful",
-                            "timestamp": datetime.now().isoformat()
-                        }
-                        feedback = st.text_area("Please tell us how we can improve:", key=f"feedback_text_{message_id}")
-                        if feedback:
-                            st.session_state.feedback[message_id]["comment"] = feedback
-                            st.success("Thank you for your detailed feedback!")
-                
-                st.markdown('</div>', unsafe_allow_html=True)
 
 def chat_page(chatbot: MedicalAIChatbot):
     st.subheader("Medical Consultation Chat")
@@ -240,10 +214,14 @@ def chat_page(chatbot: MedicalAIChatbot):
     
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
+    if "feedback" not in st.session_state:
+        st.session_state.feedback = {}
 
+    # Display chat messages
     for message in st.session_state.chat_history:
         display_message(message["role"], message["content"], message.get("id"))
 
+    # Handle user input
     user_input = st.chat_input("Ask a medical question or describe symptoms...")
     if user_input:
         message_id = str(uuid.uuid4())
@@ -253,9 +231,39 @@ def chat_page(chatbot: MedicalAIChatbot):
         st.session_state.chat_history.append({"role": "assistant", "content": ai_response, "id": message_id})
         display_message("assistant", ai_response, message_id)
     
+    # Clear chat button
     if st.button("Clear Chat"):
         st.session_state.chat_history = []
         st.rerun()
+
+    # Move feedback system to sidebar
+    with st.sidebar:
+        st.markdown("### Message Feedback")
+        if st.session_state.chat_history:
+            latest_message = st.session_state.chat_history[-1]
+            if latest_message["role"] == "assistant":
+                message_id = latest_message["id"]
+                st.markdown("#### Rate the last response:")
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if st.button("👍 Helpful"):
+                        st.session_state.feedback[message_id] = {
+                            "rating": "helpful",
+                            "timestamp": datetime.now().isoformat()
+                        }
+                        st.success("Thank you for your feedback!")
+                
+                with col2:
+                    if st.button("👎 Not Helpful"):
+                        st.session_state.feedback[message_id] = {
+                            "rating": "not_helpful",
+                            "timestamp": datetime.now().isoformat()
+                        }
+                        feedback = st.text_area("How can we improve?")
+                        if feedback:
+                            st.session_state.feedback[message_id]["comment"] = feedback
+                            st.success("Thank you for your detailed feedback!")
 
 def patient_records_page():
     st.subheader("Manage Patient Records")

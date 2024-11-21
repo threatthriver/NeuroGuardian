@@ -242,11 +242,11 @@ class MedicalAIChatbot:
 
 class PatientRecordManager:
     @staticmethod
-    def save_to_file(records: Dict) -> None:
+    def save_to_file(records: Dict, doctor_id: str) -> None:
         try:
             encrypted_data = fernet.encrypt(json.dumps(records).encode())
-            backup_path = Path("patient_records.bak")
-            file_path = Path("patient_records.enc")
+            backup_path = Path(f"patient_records_{doctor_id}.bak")
+            file_path = Path(f"patient_records_{doctor_id}.enc")
             
             # Create backup of existing file
             if file_path.exists():
@@ -268,9 +268,9 @@ class PatientRecordManager:
             raise
 
     @staticmethod
-    def load_from_file() -> Dict:
+    def load_from_file(doctor_id: str) -> Dict:
         try:
-            file_path = Path("patient_records.enc")
+            file_path = Path(f"patient_records_{doctor_id}.enc")
             if not file_path.exists():
                 logger.info("No existing patient records found")
                 return {}
@@ -286,7 +286,7 @@ class PatientRecordManager:
             return {}
 
     @staticmethod
-    def import_from_csv(file) -> Optional[Dict]:
+    def import_from_csv(file, doctor_id: str) -> Optional[Dict]:
         try:
             content = file.read().decode('utf-8')
             csv_data = csv.DictReader(io.StringIO(content))
@@ -332,7 +332,7 @@ class PatientRecordManager:
             return None
 
     @staticmethod
-    def create_patient_record(name: str, age: int, medical_history: str, conditions: str, medications: str) -> str:
+    def create_patient_record(name: str, age: int, medical_history: str, conditions: str, medications: str, doctor_id: str) -> str:
         try:
             patient_id = str(uuid.uuid4())[:8]
             record = {
@@ -348,10 +348,10 @@ class PatientRecordManager:
             }
             
             if "patient_records" not in st.session_state:
-                st.session_state.patient_records = PatientRecordManager.load_from_file()
+                st.session_state.patient_records = PatientRecordManager.load_from_file(doctor_id)
                 
             st.session_state.patient_records[patient_id] = record
-            PatientRecordManager.save_to_file(st.session_state.patient_records)
+            PatientRecordManager.save_to_file(st.session_state.patient_records, doctor_id)
             logger.info(f"Created new patient record: {patient_id}")
             return patient_id
         except Exception as e:
@@ -436,7 +436,7 @@ def display_message(role: str, content: str, message_id: Optional[str] = None) -
         logger.error(f"Failed to display message: {str(e)}")
         st.error("Failed to display message")
 
-def chat_page(chatbot: MedicalAIChatbot) -> None:
+def chat_page(chatbot: MedicalAIChatbot, doctor_id: str) -> None:
     try:
         st.subheader("Medical Consultation Chat")
         

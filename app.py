@@ -5,6 +5,7 @@ from groq import Groq, RateLimitError, APIError
 from dotenv import load_dotenv
 import pandas as pd
 import requests
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -84,6 +85,19 @@ st.markdown("""
         margin-bottom: 10px;
         border-radius: 5px;
         color: #dfe6e9;
+    }
+
+    .feedback-container {
+        margin-top: 10px;
+        padding: 10px;
+        border-radius: 5px;
+        background-color: #3e4558;
+    }
+
+    .feedback-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 5px;
     }
 
     /* Media query for dark mode */
@@ -171,11 +185,41 @@ class PatientRecordManager:
         st.session_state.patient_records[patient_id] = record
         return patient_id
 
-def display_message(role: str, content: str):
+def display_message(role: str, content: str, message_id: str = None):
     role_class = "user-message" if role == "user" else "ai-message"
     avatar = "🧑‍⚕️" if role == "user" else "🤖"
     with st.chat_message(role, avatar=avatar):
         st.markdown(f'<div class="{role_class}">{content}</div>', unsafe_allow_html=True)
+        
+        if role == "assistant" and message_id:
+            with st.container():
+                st.markdown('<div class="feedback-container">', unsafe_allow_html=True)
+                col1, col2, col3 = st.columns([1,1,2])
+                
+                with col1:
+                    if st.button("👍", key=f"helpful_{message_id}"):
+                        if "feedback" not in st.session_state:
+                            st.session_state.feedback = {}
+                        st.session_state.feedback[message_id] = {
+                            "rating": "helpful",
+                            "timestamp": datetime.now().isoformat()
+                        }
+                        st.success("Thank you for your feedback!")
+                
+                with col2:
+                    if st.button("👎", key=f"not_helpful_{message_id}"):
+                        if "feedback" not in st.session_state:
+                            st.session_state.feedback = {}
+                        st.session_state.feedback[message_id] = {
+                            "rating": "not_helpful",
+                            "timestamp": datetime.now().isoformat()
+                        }
+                        feedback = st.text_area("Please tell us how we can improve:", key=f"feedback_text_{message_id}")
+                        if feedback:
+                            st.session_state.feedback[message_id]["comment"] = feedback
+                            st.success("Thank you for your detailed feedback!")
+                
+                st.markdown('</div>', unsafe_allow_html=True)
 
 def chat_page(chatbot: MedicalAIChatbot):
     st.subheader("Medical Consultation Chat")
@@ -193,15 +237,17 @@ def chat_page(chatbot: MedicalAIChatbot):
         st.session_state.chat_history = []
 
     for message in st.session_state.chat_history:
-        display_message(message["role"], message["content"])
+        display_message(message["role"], message["content"], message.get("id"))
 
     user_input = st.chat_input("Ask a medical question or describe symptoms...")
     if user_input:
-        st.session_state.chat_history.append({"role": "user", "content": user_input})
+        message_id = str(uuid.uuid4())
+        st.session_state.chat_history.append({"role": "user", "content": user_input, "id": message_id})
         display_message("user", user_input)
         ai_response = chatbot.generate_response(st.session_state.chat_history, selected_patient)
-        st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
-        display_message("assistant", ai_response)
+        st.session_state.chat_history.append({"role": "assistant", "content": ai_response, "id": message_id})
+        display_message("assistant", ai_response, message_id)
+    
     if st.button("Clear Chat"):
         st.session_state.chat_history = []
         st.rerun()
@@ -233,8 +279,16 @@ def patient_records_page():
 
 def medical_dashboard():
     st.subheader("Medical Dashboard")
+    
+    # Calculate feedback metrics
+    total_feedback = len(st.session_state.get("feedback", {}))
+    helpful_count = sum(1 for f in st.session_state.get("feedback", {}).values() if f["rating"] == "helpful")
+    satisfaction_rate = (helpful_count / total_feedback * 100) if total_feedback > 0 else 0
+    
     data = {
         "Total Patients": len(st.session_state.patient_records) if "patient_records" in st.session_state else 0,
+        "Total Feedback Received": total_feedback,
+        "Satisfaction Rate": f"{satisfaction_rate:.1f}%",
         "Consultations Today": 0,  # Placeholder for future implementation
         "Cases Resolved": 0,  # Placeholder for future implementation
     }

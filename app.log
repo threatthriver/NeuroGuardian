@@ -1,0 +1,8 @@
+2024-11-21 15:47:52,151 - __main__ - INFO - Generated new encryption key
+2024-11-21 15:47:53,214 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-21 15:47:53,214 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-21 15:48:06,084 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-21 15:48:06,084 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-21 15:48:09,890 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-21 15:48:09,891 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-21 15:48:11,506 - httpx - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"

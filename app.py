@@ -6,9 +6,26 @@ from dotenv import load_dotenv
 import pandas as pd
 import requests
 from datetime import datetime
+import json
+import csv
+from pathlib import Path
+from cryptography.fernet import Fernet
 
 # Load environment variables
 load_dotenv()
+
+# Setup encryption
+def get_encryption_key():
+    key_file = Path("encryption.key")
+    if not key_file.exists():
+        key = Fernet.generate_key()
+        with open(key_file, "wb") as f:
+            f.write(key)
+    with open(key_file, "rb") as f:
+        return f.read()
+
+ENCRYPTION_KEY = get_encryption_key()
+fernet = Fernet(ENCRYPTION_KEY)
 
 # Configuration and Setup
 st.set_page_config(
@@ -53,6 +70,14 @@ st.markdown("""
         margin-bottom: 20px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         color: #dfe6e9;
+    }
+
+    .error-message {
+        background-color: #ff4757;
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
     }
 
     .stButton > button {
@@ -116,18 +141,16 @@ class MedicalAIChatbot:
             st.error("API key not found. Please set GROQ_API_KEY in your .env file.")
             raise EnvironmentError("API key not found.")
         self.client = Groq(api_key=api_key)
-        self.system_prompt = """You are NeuroGuardian, an advanced AI medical companion designed to:
-        - Provide comprehensive, evidence-based medical insights
-        - Support healthcare professionals with clinical reasoning
-        - Explain medical concepts clearly and precisely
-
-        Key Principles:
-        1. Clarify that you are an AI assistant, not a substitute for professional medical advice
-        2. Use clear and empathetic language
-        3. Simplify complex medical information
-        4. Prioritize patient safety and understanding
-        5. Recommend professional consultation when necessary
-        6. Assist with medical procedures and operations, especially in rural areas where access to specialists may be limited
+        self.system_prompt = """You are NeuroGuardian, an advanced AI medical companion. You must ONLY provide medical-related assistance and advice.
+        If users ask about non-medical topics, politely decline and explain that you can only help with medical matters.
+        
+        When providing medical assistance:
+        - Always clarify that you are an AI assistant, not a substitute for professional medical advice
+        - Use clear and empathetic language
+        - Simplify complex medical information
+        - Prioritize patient safety and understanding
+        - Recommend professional consultation when necessary
+        - Assist with medical procedures and operations, especially in rural areas
 
         Communication Style:
         - Be precise and scientific
@@ -141,15 +164,7 @@ class MedicalAIChatbot:
             if patient_data:
                 context += f"\nPatient Context:\nName: {patient_data['name']}\nAge: {patient_data['age']}\nMedical History: {patient_data['medical_history']}\nCurrent Conditions: {patient_data['current_conditions']}\nMedications: {patient_data['current_medications']}"
             
-            # Remove id from messages before sending to API
-            cleaned_messages = []
-            for msg in messages:
-                cleaned_msg = {
-                    "role": msg["role"],
-                    "content": msg["content"]
-                }
-                cleaned_messages.append(cleaned_msg)
-            
+            cleaned_messages = [{"role": msg["role"], "content": msg["content"]} for msg in messages]
             full_messages = [{"role": "system", "content": context}] + cleaned_messages
             
             with st.spinner("Generating response..."):
@@ -162,21 +177,49 @@ class MedicalAIChatbot:
                     stream=False,
                 )
             return completion.choices[0].message.content.strip()
-        except RateLimitError:
-            st.error("Too many requests. Please wait and try again.")
-            return "I'm experiencing high traffic. Please try again later."
         except Exception as e:
-            if isinstance(e, requests.Timeout):
-                st.error("The request timed out. Please try again later.")
-                return "I'm having trouble connecting. Please check your internet connection."
-            elif isinstance(e, APIError):
-                st.error("An error occurred with the API. Please try again later.")
-                return "I apologize, but there was an issue processing your request."
-            else:
-                st.error("An unexpected error occurred. Please try again later.")
-                return "An unexpected error occurred. Please try again later."
+            error_msg = "We're experiencing technical difficulties. Please try again later."
+            st.markdown(f'<div class="error-message">{error_msg}</div>', unsafe_allow_html=True)
+            return error_msg
 
 class PatientRecordManager:
+    @staticmethod
+    def save_to_file(records):
+        encrypted_data = fernet.encrypt(json.dumps(records).encode())
+        with open("patient_records.enc", "wb") as f:
+            f.write(encrypted_data)
+
+    @staticmethod
+    def load_from_file():
+        try:
+            with open("patient_records.enc", "rb") as f:
+                encrypted_data = f.read()
+            decrypted_data = fernet.decrypt(encrypted_data)
+            return json.loads(decrypted_data)
+        except FileNotFoundError:
+            return {}
+
+    @staticmethod
+    def import_from_csv(file):
+        try:
+            df = pd.read_csv(file)
+            records = {}
+            for _, row in df.iterrows():
+                patient_id = str(uuid.uuid4())[:8]
+                records[patient_id] = {
+                    "id": patient_id,
+                    "name": row["name"],
+                    "age": int(row["age"]),
+                    "medical_history": row["medical_history"],
+                    "current_conditions": row["current_conditions"],
+                    "current_medications": row["current_medications"],
+                    "consultations": []
+                }
+            return records
+        except Exception as e:
+            st.error("Error importing CSV file. Please check the format.")
+            return None
+
     @staticmethod
     def create_patient_record(name: str, age: int, medical_history: str, conditions: str, medications: str) -> str:
         patient_id = str(uuid.uuid4())[:8]
@@ -190,8 +233,9 @@ class PatientRecordManager:
             "consultations": []
         }
         if "patient_records" not in st.session_state:
-            st.session_state.patient_records = {}
+            st.session_state.patient_records = PatientRecordManager.load_from_file()
         st.session_state.patient_records[patient_id] = record
+        PatientRecordManager.save_to_file(st.session_state.patient_records)
         return patient_id
 
 def display_message(role: str, content: str, message_id: str = None):
@@ -268,8 +312,20 @@ def chat_page(chatbot: MedicalAIChatbot):
 def patient_records_page():
     st.subheader("Manage Patient Records")
     if "patient_records" not in st.session_state:
-        st.session_state.patient_records = {}
+        st.session_state.patient_records = PatientRecordManager.load_from_file()
 
+    # Import patient records from CSV
+    st.markdown("### Import Patient Records")
+    uploaded_file = st.file_uploader("Upload CSV file with patient records", type="csv")
+    if uploaded_file is not None:
+        if st.button("Import Records"):
+            imported_records = PatientRecordManager.import_from_csv(uploaded_file)
+            if imported_records:
+                st.session_state.patient_records.update(imported_records)
+                PatientRecordManager.save_to_file(st.session_state.patient_records)
+                st.success("Patient records imported successfully!")
+
+    st.markdown("### Add New Patient")
     form = st.form(key="patient_form")
     name = form.text_input("Patient Name")
     age = form.number_input("Age", min_value=1)
@@ -283,6 +339,7 @@ def patient_records_page():
         st.success("Patient record saved successfully!")
 
     if st.session_state.patient_records:
+        st.markdown("### Existing Records")
         for pid, record in st.session_state.patient_records.items():
             with st.expander(record["name"]):
                 st.write(f"Age: {record['age']}")

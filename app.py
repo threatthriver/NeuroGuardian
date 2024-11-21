@@ -11,22 +11,52 @@ import csv
 from pathlib import Path
 from cryptography.fernet import Fernet
 import io
+import logging
+from typing import Dict, List, Optional, Union
+import traceback
 
-# Load environment variables
-load_dotenv()
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('app.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
-# Setup encryption
-def get_encryption_key():
-    key_file = Path("encryption.key")
-    if not key_file.exists():
-        key = Fernet.generate_key()
-        with open(key_file, "wb") as f:
-            f.write(key)
-    with open(key_file, "rb") as f:
-        return f.read()
+# Load environment variables with error handling
+def load_environment():
+    try:
+        load_dotenv()
+        if not os.getenv("GROQ_API_KEY"):
+            raise EnvironmentError("GROQ_API_KEY not found in environment variables")
+    except Exception as e:
+        logger.error(f"Failed to load environment variables: {str(e)}")
+        raise
 
-ENCRYPTION_KEY = get_encryption_key()
-fernet = Fernet(ENCRYPTION_KEY)
+load_environment()
+
+# Setup encryption with better error handling
+def get_encryption_key() -> bytes:
+    try:
+        key_file = Path("encryption.key")
+        if not key_file.exists():
+            key = Fernet.generate_key()
+            key_file.write_bytes(key)
+            logger.info("Generated new encryption key")
+        return key_file.read_bytes()
+    except Exception as e:
+        logger.error(f"Failed to get encryption key: {str(e)}")
+        raise
+
+try:
+    ENCRYPTION_KEY = get_encryption_key()
+    fernet = Fernet(ENCRYPTION_KEY)
+except Exception as e:
+    logger.critical(f"Failed to initialize encryption: {str(e)}")
+    raise
 
 # Configuration and Setup
 st.set_page_config(
@@ -137,33 +167,46 @@ st.markdown("""
 
 class MedicalAIChatbot:
     def __init__(self):
-        api_key = os.getenv("GROQ_API_KEY")
-        if not api_key:
-            st.error("API key not found. Please set GROQ_API_KEY in your .env file.")
-            raise EnvironmentError("API key not found.")
-        self.client = Groq(api_key=api_key)
-        self.system_prompt = """You are NeuroGuardian, an advanced AI medical companion. You must ONLY provide medical-related assistance and advice.
-        If users ask about non-medical topics, politely decline and explain that you can only help with medical matters.
-        
-        When providing medical assistance:
-        - Always clarify that you are an AI assistant, not a substitute for professional medical advice
-        - Use clear and empathetic language
-        - Simplify complex medical information
-        - Prioritize patient safety and understanding
-        - Recommend professional consultation when necessary
-        - Assist with medical procedures and operations, especially in rural areas
+        try:
+            api_key = os.getenv("GROQ_API_KEY")
+            if not api_key:
+                raise EnvironmentError("API key not found")
+            self.client = Groq(api_key=api_key)
+            self._load_system_prompt()
+            logger.info("MedicalAIChatbot initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize MedicalAIChatbot: {str(e)}")
+            st.error("Failed to initialize chatbot. Please check logs for details.")
+            raise
 
-        Communication Style:
-        - Be precise and scientific
-        - Use medical terminology with clear explanations
-        - Provide balanced, objective information
-        - Maintain a supportive and professional tone"""
+    def _load_system_prompt(self):
+        try:
+            with open('system_prompt.txt', 'r') as f:
+                self.system_prompt = f.read()
+        except FileNotFoundError:
+            self.system_prompt = """You are NeuroGuardian, an advanced AI medical companion. You must ONLY provide medical-related assistance and advice.
+            If users ask about non-medical topics, politely decline and explain that you can only help with medical matters.
+            
+            When providing medical assistance:
+            - Always clarify that you are an AI assistant, not a substitute for professional medical advice
+            - Use clear and empathetic language
+            - Simplify complex medical information
+            - Prioritize patient safety and understanding
+            - Recommend professional consultation when necessary
+            - Assist with medical procedures and operations, especially in rural areas
 
-    def generate_response(self, messages: list, patient_data: dict = None) -> str:
+            Communication Style:
+            - Be precise and scientific
+            - Use medical terminology with clear explanations
+            - Provide balanced, objective information
+            - Maintain a supportive and professional tone"""
+            logger.warning("System prompt file not found, using default prompt")
+
+    def generate_response(self, messages: List[Dict[str, str]], patient_data: Optional[Dict[str, str]] = None) -> str:
         try:
             context = self.system_prompt
             if patient_data:
-                context += f"\nPatient Context:\nName: {patient_data['name']}\nAge: {patient_data['age']}\nMedical History: {patient_data['medical_history']}\nCurrent Conditions: {patient_data['current_conditions']}\nMedications: {patient_data['current_medications']}"
+                context += self._format_patient_context(patient_data)
             
             cleaned_messages = [{"role": msg["role"], "content": msg["content"]} for msg in messages]
             full_messages = [{"role": "system", "content": context}] + cleaned_messages
@@ -178,47 +221,85 @@ class MedicalAIChatbot:
                     stream=False,
                 )
             return completion.choices[0].message.content.strip()
-        except Exception as e:
-            error_msg = "We're experiencing technical difficulties. Please try again later."
-            st.markdown(f'<div class="error-message">{error_msg}</div>', unsafe_allow_html=True)
+        except RateLimitError:
+            error_msg = "Rate limit exceeded. Please try again in a few moments."
+            logger.warning("Rate limit exceeded")
+            st.warning(error_msg)
             return error_msg
+        except APIError as e:
+            error_msg = f"API Error: {str(e)}"
+            logger.error(f"API Error: {str(e)}")
+            st.error(error_msg)
+            return error_msg
+        except Exception as e:
+            error_msg = "An unexpected error occurred. Please try again later."
+            logger.error(f"Unexpected error in generate_response: {str(e)}\n{traceback.format_exc()}")
+            st.error(error_msg)
+            return error_msg
+
+    def _format_patient_context(self, patient_data: Dict[str, str]) -> str:
+        return f"\nPatient Context:\nName: {patient_data.get('name', 'N/A')}\nAge: {patient_data.get('age', 'N/A')}\nMedical History: {patient_data.get('medical_history', 'N/A')}\nCurrent Conditions: {patient_data.get('current_conditions', 'N/A')}\nMedications: {patient_data.get('current_medications', 'N/A')}"
 
 class PatientRecordManager:
     @staticmethod
-    def save_to_file(records):
-        encrypted_data = fernet.encrypt(json.dumps(records).encode())
-        with open("patient_records.enc", "wb") as f:
-            f.write(encrypted_data)
+    def save_to_file(records: Dict) -> None:
+        try:
+            encrypted_data = fernet.encrypt(json.dumps(records).encode())
+            backup_path = Path("patient_records.bak")
+            file_path = Path("patient_records.enc")
+            
+            # Create backup of existing file
+            if file_path.exists():
+                file_path.rename(backup_path)
+            
+            # Write new data
+            with open(file_path, "wb") as f:
+                f.write(encrypted_data)
+                
+            # Remove backup if write was successful
+            if backup_path.exists():
+                backup_path.unlink()
+                
+            logger.info("Successfully saved patient records")
+        except Exception as e:
+            logger.error(f"Failed to save patient records: {str(e)}")
+            if backup_path.exists():
+                backup_path.rename(file_path)
+            raise
 
     @staticmethod
-    def load_from_file():
+    def load_from_file() -> Dict:
         try:
-            with open("patient_records.enc", "rb") as f:
+            file_path = Path("patient_records.enc")
+            if not file_path.exists():
+                logger.info("No existing patient records found")
+                return {}
+                
+            with open(file_path, "rb") as f:
                 encrypted_data = f.read()
             decrypted_data = fernet.decrypt(encrypted_data)
-            return json.loads(decrypted_data)
-        except FileNotFoundError:
+            records = json.loads(decrypted_data)
+            logger.info(f"Successfully loaded {len(records)} patient records")
+            return records
+        except Exception as e:
+            logger.error(f"Failed to load patient records: {str(e)}")
             return {}
 
     @staticmethod
-    def import_from_csv(file):
+    def import_from_csv(file) -> Optional[Dict]:
         try:
-            # Read CSV file content
             content = file.read().decode('utf-8')
             csv_data = csv.DictReader(io.StringIO(content))
             
             required_fields = ["name", "age", "medical_history", "current_conditions", "current_medications"]
             
-            # Validate CSV structure
             headers = csv_data.fieldnames
             if not headers or not all(field in headers for field in required_fields):
-                st.error("Invalid CSV format. Required columns: name, age, medical_history, current_conditions, current_medications")
-                return None
+                raise ValueError("Invalid CSV format. Missing required columns.")
             
             records = {}
             for row in csv_data:
                 try:
-                    # Validate data types and required fields
                     if not row["name"].strip():
                         continue
                     
@@ -237,216 +318,303 @@ class PatientRecordManager:
                         "consultations": []
                     }
                 except (ValueError, KeyError) as e:
-                    st.warning(f"Skipping invalid record: {row.get('name', 'Unknown')}. Error: {str(e)}")
+                    logger.warning(f"Invalid record in CSV: {str(e)}")
                     continue
                     
             if not records:
-                st.error("No valid records found in the CSV file")
-                return None
+                raise ValueError("No valid records found in CSV file")
                 
+            logger.info(f"Successfully imported {len(records)} records from CSV")
             return records
             
         except Exception as e:
-            st.error(f"Error importing CSV file: {str(e)}")
+            logger.error(f"Failed to import CSV: {str(e)}")
             return None
 
     @staticmethod
     def create_patient_record(name: str, age: int, medical_history: str, conditions: str, medications: str) -> str:
-        patient_id = str(uuid.uuid4())[:8]
-        record = {
-            "id": patient_id,
-            "name": name,
-            "age": age,
-            "medical_history": medical_history,
-            "current_conditions": conditions,
-            "current_medications": medications,
-            "consultations": []
-        }
+        try:
+            patient_id = str(uuid.uuid4())[:8]
+            record = {
+                "id": patient_id,
+                "name": name,
+                "age": age,
+                "medical_history": medical_history,
+                "current_conditions": conditions,
+                "current_medications": medications,
+                "consultations": [],
+                "created_at": datetime.now().isoformat(),
+                "last_updated": datetime.now().isoformat()
+            }
+            
+            if "patient_records" not in st.session_state:
+                st.session_state.patient_records = PatientRecordManager.load_from_file()
+                
+            st.session_state.patient_records[patient_id] = record
+            PatientRecordManager.save_to_file(st.session_state.patient_records)
+            logger.info(f"Created new patient record: {patient_id}")
+            return patient_id
+        except Exception as e:
+            logger.error(f"Failed to create patient record: {str(e)}")
+            raise
+
+def display_message(role: str, content: str, message_id: Optional[str] = None) -> None:
+    try:
+        role_class = "user-message" if role == "user" else "ai-message"
+        avatar = "🧑‍⚕️" if role == "user" else "🤖"
+        with st.chat_message(role, avatar=avatar):
+            st.markdown(f'<div class="{role_class}">{content}</div>', unsafe_allow_html=True)
+    except Exception as e:
+        logger.error(f"Failed to display message: {str(e)}")
+        st.error("Failed to display message")
+
+def chat_page(chatbot: MedicalAIChatbot) -> None:
+    try:
+        st.subheader("Medical Consultation Chat")
+        
+        # Initialize session state
+        if "chat_history" not in st.session_state:
+            st.session_state.chat_history = []
+        if "feedback" not in st.session_state:
+            st.session_state.feedback = {}
+        
+        # Patient selection
+        selected_patient = None
+        if st.session_state.get("patient_records"):
+            patient_names = ["None"] + [record["name"] for record in st.session_state.patient_records.values()]
+            selected_name = st.selectbox("Select Patient for Context:", patient_names)
+            if selected_name != "None":
+                selected_patient = next((record for record in st.session_state.patient_records.values() 
+                                      if record["name"] == selected_name), None)
+                st.info(f"Chatting with context for patient: {selected_name}")
+        
+        # Display chat history
+        for message in st.session_state.chat_history:
+            display_message(message["role"], message["content"], message.get("id"))
+
+        # Handle user input
+        user_input = st.chat_input("Ask a medical question or describe symptoms...")
+        if user_input:
+            message_id = str(uuid.uuid4())
+            st.session_state.chat_history.append({
+                "role": "user", 
+                "content": user_input,
+                "id": message_id,
+                "timestamp": datetime.now().isoformat()
+            })
+            display_message("user", user_input)
+            
+            ai_response = chatbot.generate_response(st.session_state.chat_history, selected_patient)
+            st.session_state.chat_history.append({
+                "role": "assistant",
+                "content": ai_response,
+                "id": message_id,
+                "timestamp": datetime.now().isoformat()
+            })
+            display_message("assistant", ai_response, message_id)
+        
+        # Clear chat button with confirmation
+        if st.button("Clear Chat"):
+            if st.session_state.chat_history:
+                if st.button("Confirm Clear Chat"):
+                    st.session_state.chat_history = []
+                    st.rerun()
+            else:
+                st.session_state.chat_history = []
+                st.rerun()
+
+        # Feedback system in sidebar
+        with st.sidebar:
+            st.markdown("### Message Feedback")
+            if st.session_state.chat_history:
+                latest_message = st.session_state.chat_history[-1]
+                if latest_message["role"] == "assistant":
+                    message_id = latest_message["id"]
+                    st.markdown("#### Rate the last response:")
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        if st.button("👍 Helpful"):
+                            st.session_state.feedback[message_id] = {
+                                "rating": "helpful",
+                                "timestamp": datetime.now().isoformat()
+                            }
+                            st.success("Thank you for your feedback!")
+                    
+                    with col2:
+                        if st.button("👎 Not Helpful"):
+                            st.session_state.feedback[message_id] = {
+                                "rating": "not_helpful",
+                                "timestamp": datetime.now().isoformat()
+                            }
+                            feedback = st.text_area("How can we improve?")
+                            if feedback:
+                                st.session_state.feedback[message_id]["comment"] = feedback
+                                st.success("Thank you for your detailed feedback!")
+                                
+    except Exception as e:
+        logger.error(f"Error in chat page: {str(e)}\n{traceback.format_exc()}")
+        st.error("An error occurred. Please try refreshing the page.")
+
+def patient_records_page() -> None:
+    try:
+        st.subheader("Manage Patient Records")
         if "patient_records" not in st.session_state:
             st.session_state.patient_records = PatientRecordManager.load_from_file()
-        st.session_state.patient_records[patient_id] = record
-        PatientRecordManager.save_to_file(st.session_state.patient_records)
-        return patient_id
 
-def display_message(role: str, content: str, message_id: str = None):
-    role_class = "user-message" if role == "user" else "ai-message"
-    avatar = "🧑‍⚕️" if role == "user" else "🤖"
-    with st.chat_message(role, avatar=avatar):
-        st.markdown(f'<div class="{role_class}">{content}</div>', unsafe_allow_html=True)
+        # Import patient records from CSV
+        st.markdown("### Import Patient Records")
+        st.markdown("""
+        Upload a CSV file with the following columns:
+        - name (required)
+        - age (required, must be positive number)
+        - medical_history
+        - current_conditions
+        - current_medications
+        """)
+        
+        uploaded_file = st.file_uploader("Upload CSV file with patient records", type="csv")
+        if uploaded_file is not None:
+            if st.button("Import Records"):
+                with st.spinner("Importing records..."):
+                    imported_records = PatientRecordManager.import_from_csv(uploaded_file)
+                    if imported_records:
+                        st.session_state.patient_records.update(imported_records)
+                        PatientRecordManager.save_to_file(st.session_state.patient_records)
+                        st.success(f"Successfully imported {len(imported_records)} patient records!")
+                        st.rerun()
 
-def chat_page(chatbot: MedicalAIChatbot):
-    st.subheader("Medical Consultation Chat")
-    
-    # Add patient selection
-    selected_patient = None
-    if st.session_state.get("patient_records"):
-        patient_names = ["None"] + [record["name"] for record in st.session_state.patient_records.values()]
-        selected_name = st.selectbox("Select Patient for Context:", patient_names)
-        if selected_name != "None":
-            selected_patient = next((record for record in st.session_state.patient_records.values() if record["name"] == selected_name), None)
-            st.info(f"Chatting with context for patient: {selected_name}")
-    
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
-    if "feedback" not in st.session_state:
-        st.session_state.feedback = {}
+        # Add new patient form
+        st.markdown("### Add New Patient")
+        with st.form(key="patient_form"):
+            name = st.text_input("Patient Name")
+            age = st.number_input("Age", min_value=1)
+            medical_history = st.text_area("Medical History")
+            conditions = st.text_area("Current Conditions")
+            medications = st.text_area("Current Medications")
+            submit = st.form_submit_button("Save Record")
 
-    # Display chat messages
-    for message in st.session_state.chat_history:
-        display_message(message["role"], message["content"], message.get("id"))
+            if submit:
+                if not name.strip():
+                    st.error("Patient name is required")
+                else:
+                    try:
+                        PatientRecordManager.create_patient_record(
+                            name, age, medical_history, conditions, medications
+                        )
+                        st.success("Patient record saved successfully!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to save patient record: {str(e)}")
 
-    # Handle user input
-    user_input = st.chat_input("Ask a medical question or describe symptoms...")
-    if user_input:
-        message_id = str(uuid.uuid4())
-        st.session_state.chat_history.append({"role": "user", "content": user_input, "id": message_id})
-        display_message("user", user_input)
-        ai_response = chatbot.generate_response(st.session_state.chat_history, selected_patient)
-        st.session_state.chat_history.append({"role": "assistant", "content": ai_response, "id": message_id})
-        display_message("assistant", ai_response, message_id)
-    
-    # Clear chat button
-    if st.button("Clear Chat"):
-        st.session_state.chat_history = []
-        st.rerun()
+        # Display existing records
+        if st.session_state.patient_records:
+            st.markdown("### Existing Records")
+            for pid, record in st.session_state.patient_records.items():
+                with st.expander(f"{record['name']} (ID: {pid})"):
+                    st.write(f"Age: {record['age']}")
+                    st.write(f"Medical History: {record['medical_history']}")
+                    st.write(f"Conditions: {record['current_conditions']}")
+                    st.write(f"Medications: {record['current_medications']}")
+                    if st.button(f"Delete Record {pid}"):
+                        if st.button(f"Confirm Delete {pid}"):
+                            del st.session_state.patient_records[pid]
+                            PatientRecordManager.save_to_file(st.session_state.patient_records)
+                            st.success("Record deleted successfully!")
+                            st.rerun()
+                            
+    except Exception as e:
+        logger.error(f"Error in patient records page: {str(e)}\n{traceback.format_exc()}")
+        st.error("An error occurred. Please try refreshing the page.")
 
-    # Move feedback system to sidebar
-    with st.sidebar:
-        st.markdown("### Message Feedback")
-        if st.session_state.chat_history:
-            latest_message = st.session_state.chat_history[-1]
-            if latest_message["role"] == "assistant":
-                message_id = latest_message["id"]
-                st.markdown("#### Rate the last response:")
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    if st.button("👍 Helpful"):
-                        st.session_state.feedback[message_id] = {
-                            "rating": "helpful",
-                            "timestamp": datetime.now().isoformat()
-                        }
-                        st.success("Thank you for your feedback!")
-                
-                with col2:
-                    if st.button("👎 Not Helpful"):
-                        st.session_state.feedback[message_id] = {
-                            "rating": "not_helpful",
-                            "timestamp": datetime.now().isoformat()
-                        }
-                        feedback = st.text_area("How can we improve?")
-                        if feedback:
-                            st.session_state.feedback[message_id]["comment"] = feedback
-                            st.success("Thank you for your detailed feedback!")
+def medical_dashboard() -> None:
+    try:
+        st.subheader("Medical Dashboard")
+        
+        # Calculate metrics
+        total_feedback = len(st.session_state.get("feedback", {}))
+        helpful_count = sum(1 for f in st.session_state.get("feedback", {}).values() 
+                          if f["rating"] == "helpful")
+        satisfaction_rate = (helpful_count / total_feedback * 100) if total_feedback > 0 else 0
+        
+        # Get today's consultations
+        today = datetime.now().date()
+        consultations_today = sum(1 for msg in st.session_state.get("chat_history", [])
+                                if msg["role"] == "user" and 
+                                datetime.fromisoformat(msg["timestamp"]).date() == today)
+        
+        data = {
+            "Total Patients": len(st.session_state.patient_records) if "patient_records" in st.session_state else 0,
+            "Total Feedback Received": total_feedback,
+            "Satisfaction Rate": f"{satisfaction_rate:.1f}%",
+            "Consultations Today": consultations_today,
+            "Active Cases": len([p for p in st.session_state.get("patient_records", {}).values() 
+                               if p.get("current_conditions")])
+        }
+        
+        # Display metrics
+        df = pd.DataFrame(list(data.items()), columns=["Metric", "Value"])
+        st.write(df)
+        
+        # Add visualizations
+        if st.session_state.get("feedback"):
+            feedback_df = pd.DataFrame(st.session_state["feedback"].values())
+            st.subheader("Feedback Analysis")
+            st.bar_chart(feedback_df["rating"].value_counts())
+            
+    except Exception as e:
+        logger.error(f"Error in medical dashboard: {str(e)}\n{traceback.format_exc()}")
+        st.error("An error occurred loading the dashboard. Please try refreshing the page.")
 
-def patient_records_page():
-    st.subheader("Manage Patient Records")
-    if "patient_records" not in st.session_state:
-        st.session_state.patient_records = PatientRecordManager.load_from_file()
+def main() -> None:
+    try:
+        st.markdown('<div class="main-header"><h1>🧠 NeuroGuardian: Advanced Medical AI Assistant</h1></div>', 
+                   unsafe_allow_html=True)
 
-    # Import patient records from CSV
-    st.markdown("### Import Patient Records")
-    st.markdown("""
-    Upload a CSV file with the following columns:
-    - name (required)
-    - age (required, must be positive number)
-    - medical_history
-    - current_conditions
-    - current_medications
-    """)
-    
-    uploaded_file = st.file_uploader("Upload CSV file with patient records", type="csv")
-    if uploaded_file is not None:
-        if st.button("Import Records"):
-            with st.spinner("Importing records..."):
-                imported_records = PatientRecordManager.import_from_csv(uploaded_file)
-                if imported_records:
-                    st.session_state.patient_records.update(imported_records)
-                    PatientRecordManager.save_to_file(st.session_state.patient_records)
-                    st.success(f"Successfully imported {len(imported_records)} patient records!")
-                    st.rerun()
+        pages = ["Chat Assistant", "Patient Records", "Medical Dashboard"]
+        selected_page = st.sidebar.selectbox("Navigation", pages)
 
-    st.markdown("### Add New Patient")
-    form = st.form(key="patient_form")
-    name = form.text_input("Patient Name")
-    age = form.number_input("Age", min_value=1)
-    medical_history = form.text_area("Medical History")
-    conditions = form.text_area("Current Conditions")
-    medications = form.text_area("Current Medications")
-    submit = form.form_submit_button("Save Record")
+        st.sidebar.markdown('<div class="sidebar-content"><h2>NeuroGuardian</h2></div>', 
+                          unsafe_allow_html=True)
+        
+        # Display version info and updates in sidebar
+        with st.sidebar:
+            st.markdown("### Latest Updates (Version 2.0):")
+            st.markdown("#### Major Improvements:")
+            st.markdown("- Advanced AI model integration with enhanced medical knowledge")
+            st.markdown("- Real-time patient vitals monitoring system")
+            st.markdown("- Secure electronic health records (EHR) management")
+            st.markdown("- Multi-language support for global accessibility")
+            st.markdown("#### New Features:")
+            st.markdown("- Intelligent symptom analysis and prediction")
+            st.markdown("- Automated medical report generation")
+            st.markdown("- Emergency response protocol system")
+            st.markdown("- Integrated telemedicine capabilities")
+            st.markdown("#### Technical Improvements:")
+            st.markdown("- Enhanced UI/UX with dark mode optimization")
+            st.markdown("- Improved response time and accuracy")
+            st.markdown("- Advanced data encryption and security measures")
+            st.markdown("- Cloud-based backup and synchronization")
+            if st.button("View Full Release Notes"):
+                st.info("Version 2.0 introduces comprehensive medical AI capabilities, enhanced security features, and improved user experience.")
 
-    if submit:
-        PatientRecordManager.create_patient_record(name, age, medical_history, conditions, medications)
-        st.success("Patient record saved successfully!")
-
-    if st.session_state.patient_records:
-        st.markdown("### Existing Records")
-        for pid, record in st.session_state.patient_records.items():
-            with st.expander(record["name"]):
-                st.write(f"Age: {record['age']}")
-                st.write(f"Medical History: {record['medical_history']}")
-                st.write(f"Conditions: {record['current_conditions']}")
-                st.write(f"Medications: {record['current_medications']}")
-
-def medical_dashboard():
-    st.subheader("Medical Dashboard")
-    
-    # Calculate feedback metrics
-    total_feedback = len(st.session_state.get("feedback", {}))
-    helpful_count = sum(1 for f in st.session_state.get("feedback", {}).values() if f["rating"] == "helpful")
-    satisfaction_rate = (helpful_count / total_feedback * 100) if total_feedback > 0 else 0
-    
-    data = {
-        "Total Patients": len(st.session_state.patient_records) if "patient_records" in st.session_state else 0,
-        "Total Feedback Received": total_feedback,
-        "Satisfaction Rate": f"{satisfaction_rate:.1f}%",
-        "Consultations Today": 0,  # Placeholder for future implementation
-        "Cases Resolved": 0,  # Placeholder for future implementation
-    }
-    st.write(pd.DataFrame(list(data.items()), columns=["Metric", "Value"]))
-
-def main():
-    st.markdown('<div class="main-header"><h1>🧠 NeuroGuardian: Advanced Medical AI Assistant</h1></div>', unsafe_allow_html=True)
-
-    pages = ["Chat Assistant", "Patient Records", "Medical Dashboard"]
-    
-    selected_page = st.sidebar.selectbox(
-        "Navigation", pages
-    )
-
-    st.sidebar.markdown('<div class="sidebar-content"><h2>NeuroGuardian</h2></div>', unsafe_allow_html=True)
-    with st.sidebar:
-        st.markdown("### Latest Updates (Version 2.0):")
-        st.markdown("#### Major Improvements:")
-        st.markdown("- Advanced AI model integration with enhanced medical knowledge")
-        st.markdown("- Real-time patient vitals monitoring system")
-        st.markdown("- Secure electronic health records (EHR) management")
-        st.markdown("- Multi-language support for global accessibility")
-        st.markdown("#### New Features:")
-        st.markdown("- Intelligent symptom analysis and prediction")
-        st.markdown("- Automated medical report generation")
-        st.markdown("- Emergency response protocol system")
-        st.markdown("- Integrated telemedicine capabilities")
-        st.markdown("#### Technical Improvements:")
-        st.markdown("- Enhanced UI/UX with dark mode optimization")
-        st.markdown("- Improved response time and accuracy")
-        st.markdown("- Advanced data encryption and security measures")
-        st.markdown("- Cloud-based backup and synchronization")
-        if st.button("View Full Release Notes"):
-            st.info("Version 1.0 marks our official release with comprehensive medical AI capabilities and enhanced security features.")
-
-    if selected_page == "Chat Assistant":
-        st.markdown('<div class="stContainer">', unsafe_allow_html=True)
-        chat_page(MedicalAIChatbot())
-        st.markdown('</div>', unsafe_allow_html=True)
-    elif selected_page == "Patient Records":
-        st.markdown('<div class="stContainer">', unsafe_allow_html=True)
-        patient_records_page()
-        st.markdown('</div>', unsafe_allow_html=True)
-    elif selected_page == "Medical Dashboard":
-        st.markdown('<div class="stContainer">', unsafe_allow_html=True)
-        medical_dashboard()
-        st.markdown('</div>', unsafe_allow_html=True)
+        # Route to selected page
+        if selected_page == "Chat Assistant":
+            st.markdown('<div class="stContainer">', unsafe_allow_html=True)
+            chat_page(MedicalAIChatbot())
+            st.markdown('</div>', unsafe_allow_html=True)
+        elif selected_page == "Patient Records":
+            st.markdown('<div class="stContainer">', unsafe_allow_html=True)
+            patient_records_page()
+            st.markdown('</div>', unsafe_allow_html=True)
+        elif selected_page == "Medical Dashboard":
+            st.markdown('<div class="stContainer">', unsafe_allow_html=True)
+            medical_dashboard()
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+    except Exception as e:
+        logger.critical(f"Critical error in main: {str(e)}\n{traceback.format_exc()}")
+        st.error("A critical error occurred. Please contact support.")
 
 if __name__ == "__main__":
     main()

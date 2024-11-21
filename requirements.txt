@@ -1,4 +1,12 @@
-groq
+os
+uuid
 streamlit
-streamlit-chat
+groq
 python-dotenv
+pandas
+requests
+datetime
+json
+csv
+pathlib
+cryptography

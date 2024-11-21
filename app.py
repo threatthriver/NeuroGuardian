@@ -358,6 +358,74 @@ class PatientRecordManager:
             logger.error(f"Failed to create patient record: {str(e)}")
             raise
 
+class DoctorManager:
+    @staticmethod
+    def create_doctor_record(name: str, specialty: str) -> str:
+        try:
+            doctor_id = str(uuid.uuid4())[:8]
+            record = {
+                "id": doctor_id,
+                "name": name,
+                "specialty": specialty,
+                "created_at": datetime.now().isoformat(),
+                "last_updated": datetime.now().isoformat()
+            }
+            
+            if "doctor_records" not in st.session_state:
+                st.session_state.doctor_records = DoctorManager.load_from_file()
+                
+            st.session_state.doctor_records[doctor_id] = record
+            DoctorManager.save_to_file(st.session_state.doctor_records)
+            logger.info(f"Created new doctor record: {doctor_id}")
+            return doctor_id
+        except Exception as e:
+            logger.error(f"Failed to create doctor record: {str(e)}")
+            raise
+
+    @staticmethod
+    def save_to_file(records: Dict) -> None:
+        try:
+            encrypted_data = fernet.encrypt(json.dumps(records).encode())
+            backup_path = Path("doctor_records.bak")
+            file_path = Path("doctor_records.enc")
+            
+            # Create backup of existing file
+            if file_path.exists():
+                file_path.rename(backup_path)
+            
+            # Write new data
+            with open(file_path, "wb") as f:
+                f.write(encrypted_data)
+                
+            # Remove backup if write was successful
+            if backup_path.exists():
+                backup_path.unlink()
+                
+            logger.info("Successfully saved doctor records")
+        except Exception as e:
+            logger.error(f"Failed to save doctor records: {str(e)}")
+            if backup_path.exists():
+                backup_path.rename(file_path)
+            raise
+
+    @staticmethod
+    def load_from_file() -> Dict:
+        try:
+            file_path = Path("doctor_records.enc")
+            if not file_path.exists():
+                logger.info("No existing doctor records found")
+                return {}
+                
+            with open(file_path, "rb") as f:
+                encrypted_data = f.read()
+            decrypted_data = fernet.decrypt(encrypted_data)
+            records = json.loads(decrypted_data)
+            logger.info(f"Successfully loaded {len(records)} doctor records")
+            return records
+        except Exception as e:
+            logger.error(f"Failed to load doctor records: {str(e)}")
+            return {}
+
 def display_message(role: str, content: str, message_id: Optional[str] = None) -> None:
     try:
         role_class = "user-message" if role == "user" else "ai-message"

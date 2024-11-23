@@ -1,5 +1,7 @@
 streamlit
 groq
 python-dotenv
-beautifulsoup4
+pandas
 requests
+pathlib
+cryptography

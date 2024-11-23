@@ -56,3 +56,23 @@
 2024-11-23 19:30:08,933 - __main__ - WARNING - System prompt file not found, using default prompt
 2024-11-23 19:30:08,933 - __main__ - INFO - MedicalAIChatbot initialized successfully
 2024-11-23 19:30:09,699 - httpx - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-23 21:24:12,352 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 21:24:12,352 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 21:24:23,389 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 21:24:23,390 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 21:24:27,831 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 21:24:27,831 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 21:24:29,391 - __main__ - INFO - No existing patient records found
+2024-11-23 21:24:33,530 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 21:24:33,530 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 21:24:37,996 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 21:24:37,996 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 21:24:39,004 - httpx - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-23 21:27:48,976 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 21:27:48,977 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 21:27:50,371 - httpx - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-23 21:28:06,751 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 21:28:06,751 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 21:28:09,192 - httpx - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-23 21:28:17,611 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 21:28:17,611 - __main__ - INFO - MedicalAIChatbot initialized successfully

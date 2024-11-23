@@ -5,3 +5,4 @@ pandas
 requests
 pathlib
 cryptography
+cerebras-cloud-sdk

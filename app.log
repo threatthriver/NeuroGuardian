@@ -1,8 +1,58 @@
-2024-11-21 15:47:52,151 - __main__ - INFO - Generated new encryption key
-2024-11-21 15:47:53,214 - __main__ - WARNING - System prompt file not found, using default prompt
-2024-11-21 15:47:53,214 - __main__ - INFO - MedicalAIChatbot initialized successfully
-2024-11-21 15:48:06,084 - __main__ - WARNING - System prompt file not found, using default prompt
-2024-11-21 15:48:06,084 - __main__ - INFO - MedicalAIChatbot initialized successfully
-2024-11-21 15:48:09,890 - __main__ - WARNING - System prompt file not found, using default prompt
-2024-11-21 15:48:09,891 - __main__ - INFO - MedicalAIChatbot initialized successfully
-2024-11-21 15:48:11,506 - httpx - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-23 19:03:10,582 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:03:10,582 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:03:20,133 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:03:20,133 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:03:24,995 - __main__ - INFO - No existing patient records found
+2024-11-23 19:03:27,764 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:03:27,764 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:03:38,021 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:03:38,021 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:03:38,666 - httpx - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-23 19:03:40,921 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:03:40,921 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:03:41,889 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:03:41,889 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:03:41,948 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:03:41,949 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:04:30,373 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:04:30,373 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:04:34,879 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:04:34,879 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:04:36,743 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:04:36,743 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:05:51,946 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:05:51,946 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:05:56,297 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:05:56,297 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:05:56,854 - httpx - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-23 19:06:05,979 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:06:05,979 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:06:07,871 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:06:07,871 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:10:25,992 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:10:25,992 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:11:04,703 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:11:04,703 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:11:19,208 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:11:19,208 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:11:23,358 - __main__ - INFO - No existing patient records found
+2024-11-23 19:11:28,344 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:11:28,345 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:11:30,510 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:11:30,511 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:22:14,281 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:22:14,282 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:22:38,104 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:22:38,104 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:22:38,720 - httpx - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-23 19:22:54,972 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:22:54,972 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:22:55,627 - httpx - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-23 19:23:03,104 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:23:03,105 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:23:03,780 - httpx - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-23 19:29:53,206 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:29:53,206 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:30:08,933 - __main__ - WARNING - System prompt file not found, using default prompt
+2024-11-23 19:30:08,933 - __main__ - INFO - MedicalAIChatbot initialized successfully
+2024-11-23 19:30:09,699 - httpx - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"

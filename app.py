@@ -2,6 +2,7 @@ import os
 import uuid
 import streamlit as st
 from groq import Groq, RateLimitError, APIError
+from cerebras.cloud.sdk import Cerebras
 from dotenv import load_dotenv
 import pandas as pd
 import requests
@@ -30,8 +31,8 @@ logger = logging.getLogger(__name__)
 def load_environment():
     try:
         load_dotenv()
-        if not os.getenv("GROQ_API_KEY"):
-            raise EnvironmentError("GROQ_API_KEY not found in environment variables")
+        if not os.getenv("GROQ_API_KEY") and not os.getenv("CEREBRAS_API_KEY"):
+            raise EnvironmentError("GROQ_API_KEY or CEREBRAS_API_KEY not found in environment variables")
     except Exception as e:
         logger.error(f"Failed to load environment variables: {str(e)}")
         raise
@@ -66,19 +67,19 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Enhanced Custom CSS with Dark Mode Support and Improved Color Palette
+# Enhanced Custom CSS with New UI Features
 st.markdown("""
 <style>
     body {
-        background-color: #1e212d;
-        color: #dfe6e9;
-        font-family: 'Inter', sans-serif;
+        background-color: #f0f4f8;
+        color: #333;
+        font-family: 'Arial', sans-serif;
         transition: background-color 0.3s ease, color 0.3s ease;
     }
 
     .main-header {
-        background: linear-gradient(135deg, #2a3042 0%, #3e4558 100%);
-        color: #dfe6e9;
+        background: linear-gradient(135deg, #4a90e2 0%, #50e3c2 100%);
+        color: white;
         padding: 20px;
         border-radius: 10px;
         text-align: center;
@@ -87,20 +88,20 @@ st.markdown("""
     }
 
     .sidebar .sidebar-content {
-        background-color: #2a3042;
+        background-color: #ffffff;
         border-radius: 10px;
         padding: 20px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        color: #dfe6e9;
+        color: #333;
     }
 
     .stContainer {
-        background-color: #2a3042;
+        background-color: #ffffff;
         border-radius: 10px;
         padding: 20px;
         margin-bottom: 20px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        color: #dfe6e9;
+        color: #333;
     }
 
     .error-message {
@@ -112,7 +113,7 @@ st.markdown("""
     }
 
     .stButton > button {
-        background-color: #4285f4;
+        background-color: #4caf50;
         color: white;
         border: none;
         border-radius: 6px;
@@ -121,33 +122,33 @@ st.markdown("""
     }
 
     .stButton > button:hover {
-        background-color: #3273dc;
+        background-color: #45a049;
         transform: translateY(-2px);
     }
 
     .user-message {
-        background-color: #3e4558;
-        border-left: 4px solid #4285f4;
+        background-color: #e3f2fd;
+        border-left: 4px solid #2196f3;
         padding: 10px;
         margin-bottom: 10px;
         border-radius: 5px;
-        color: #dfe6e9;
+        color: #333;
     }
 
     .ai-message {
-        background-color: #2a3042;
-        border-left: 4px solid #a5d6a7;
+        background-color: #f1f8e9;
+        border-left: 4px solid #8bc34a;
         padding: 10px;
         margin-bottom: 10px;
         border-radius: 5px;
-        color: #dfe6e9;
+        color: #333;
     }
 
     .feedback-container {
         margin-top: 10px;
         padding: 10px;
         border-radius: 5px;
-        background-color: #3e4558;
+        background-color: #f9fbe7;
     }
 
     .feedback-buttons {
@@ -155,12 +156,22 @@ st.markdown("""
         gap: 10px;
         margin-top: 5px;
     }
+    /*Improved Patient Search*/
+    #patient-search input[type="text"] {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        box-sizing: border-box;
+    }
 
-    @media (prefers-color-scheme: dark) {
-        body {
-            background-color: #1e212d;
-            color: #dfe6e9;
-        }
+    /*Improved Chat Window*/
+    .stChat-message {
+        margin-bottom: 15px; /*Increased spacing between messages*/
+    }
+    .stChat-message-content {
+        padding: 15px; /*Increased padding within messages*/
+        border-radius: 10px; /*Rounded corners for messages*/
     }
 </style>
 """, unsafe_allow_html=True)
@@ -184,22 +195,26 @@ class MedicalAIChatbot:
             with open('system_prompt.txt', 'r') as f:
                 self.system_prompt = f.read()
         except FileNotFoundError:
-            self.system_prompt = """You are NeuroGuardian, an advanced AI medical companion. You must ONLY provide medical-related assistance and advice.
-            If users ask about non-medical topics, politely decline and explain that you can only help with medical matters.
+            self.system_prompt = """You are NeuroGuardian, an advanced AI medical companion developed by IntellijMind. Your primary role is to provide accurate, clear, and empathetic medical assistance, including sexual health education. 
+            You must ONLY provide medical-related assistance and advice. If users ask about non-medical topics, politely decline and explain that you can only help with medical matters.
             
             When providing medical assistance:
-            - Always clarify that you are an AI assistant, not a substitute for professional medical advice
-            - Use clear and empathetic language
-            - Simplify complex medical information
-            - Prioritize patient safety and understanding
-            - Recommend professional consultation when necessary
-            - Assist with medical procedures and operations, especially in rural areas
+            - Always clarify that you are an AI assistant, not a substitute for professional medical advice.
+            - Use clear and empathetic language, ensuring that your responses are easy to understand.
+            - Simplify complex medical information while maintaining accuracy.
+            - Prioritize patient safety and understanding in all communications.
+            - Recommend professional consultation when necessary.
+            - Assist with medical procedures and operations, especially in rural areas.
+            - Provide accurate and respectful sexual health education, addressing common questions and concerns.
 
             Communication Style:
-            - Be precise and scientific
-            - Use medical terminology with clear explanations
-            - Provide balanced, objective information
-            - Maintain a supportive and professional tone"""
+            - Be precise and scientific, using medical terminology with clear explanations.
+            - Provide balanced, objective information, and maintain a supportive and professional tone.
+            - Engage users with follow-up questions to clarify their needs and enhance understanding.
+            - Utilize examples and analogies where appropriate to aid comprehension.
+            - Ensure that responses are concise yet informative, avoiding unnecessary jargon.
+            - Always remember that your purpose is to empower users with knowledge and support their health journey.
+            - Maintain a friendly and approachable demeanor to foster trust and openness in communication."""
             logger.warning("System prompt file not found, using default prompt")
 
     def generate_response(self, messages: List[Dict[str, str]], patient_data: Optional[Dict[str, str]] = None) -> str:
@@ -212,14 +227,28 @@ class MedicalAIChatbot:
             full_messages = [{"role": "system", "content": context}] + cleaned_messages
             
             with st.spinner("Generating response..."):
-                completion = self.client.chat.completions.create(
-                    model="llama-3.2-11b-vision-preview",
-                    messages=full_messages,
-                    temperature=1,
-                    max_tokens=1024,
-                    top_p=1,
-                    stream=False,
-                )
+                try:
+                    completion = self.client.chat.completions.create(
+                        model="llama-3.2-11b-vision-preview",
+                        messages=full_messages,
+                        temperature=0.7,  # Adjusted for more focused responses
+                        max_tokens=1500,  # Increased token limit for more detailed responses
+                        top_p=0.9,
+                        stream=False,
+                    )
+                except RateLimitError:
+                    api_key = os.getenv("CEREBRAS_API_KEY")
+                    if not api_key:
+                        raise EnvironmentError("CEREBRAS_API_KEY not found")
+                    cerebras_client = Cerebras(api_key=api_key)
+                    completion = cerebras_client.chat.completions.create(
+                        model="llama-3.2-11b-vision-preview",
+                        messages=full_messages,
+                        temperature=0.7,  # Adjusted for more focused responses
+                        max_tokens=1500,  # Increased token limit for more detailed responses
+                        top_p=0.9,
+                        stream=False,
+                    )
             return completion.choices[0].message.content.strip()
         except RateLimitError:
             error_msg = "Rate limit exceeded. Please try again in a few moments."
@@ -448,11 +477,17 @@ def chat_page(chatbot: MedicalAIChatbot) -> None:
         if "confirm_clear" not in st.session_state:
             st.session_state.confirm_clear = False
         
-        # Patient selection
+        # Patient selection with improved search
         selected_patient = None
         if st.session_state.get("patient_records"):
             patient_names = ["None"] + [record["name"] for record in st.session_state.patient_records.values()]
-            selected_name = st.selectbox("Select Patient for Context:", patient_names)
+            search_term = st.text_input("Search Patients (by name):", key="patient_search")
+            if search_term:
+                filtered_names = [name for name in patient_names if search_term.lower() in name.lower()]
+                selected_name = st.selectbox("Select Patient:", filtered_names)
+            else:
+                selected_name = st.selectbox("Select Patient:", patient_names)
+
             if selected_name != "None":
                 selected_patient = next((record for record in st.session_state.patient_records.values() 
                                       if record["name"] == selected_name), None)
@@ -648,17 +683,17 @@ def main() -> None:
         st.markdown('<div class="main-header"><h1>🧠 NeuroGuardian: Advanced Medical AI Assistant</h1></div>', 
                    unsafe_allow_html=True)
 
-        pages = ["Chat Assistant", "Patient Records", "Medical Dashboard"]
+        pages = ["Chat Assistant", "Patient Records", "Medical Dashboard", "Sex Education"]
         selected_page = st.sidebar.selectbox("Navigation", pages)
 
-        st.sidebar.markdown('<div class="sidebar-content"><h2>NeuroGuardian</h2></div>', 
+        st.sidebar.markdown('<div class="sidebar-content"><h2>NeuroGuardian by IntellijMind</h2></div>', 
                           unsafe_allow_html=True)
         
         # Display version info and updates in sidebar
         with st.sidebar:
-            st.markdown("### Latest Updates (Version 2.0):")
+            st.markdown("### Latest Updates (Version 4.0):")
             st.markdown("#### Major Improvements:")
-            st.markdown("- Advanced AI model integration with enhanced medical knowledge")
+            st.markdown("- Enhanced AI model with improved accuracy and response time")
             st.markdown("- Real-time patient vitals monitoring system")
             st.markdown("- Secure electronic health records (EHR) management")
             st.markdown("- Multi-language support for global accessibility")
@@ -667,13 +702,14 @@ def main() -> None:
             st.markdown("- Automated medical report generation")
             st.markdown("- Emergency response protocol system")
             st.markdown("- Integrated telemedicine capabilities")
+            st.markdown("- Comprehensive sexual health education")
             st.markdown("#### Technical Improvements:")
-            st.markdown("- Enhanced UI/UX with dark mode optimization")
+            st.markdown("- Enhanced UI/UX with new color palette and layout")
             st.markdown("- Improved response time and accuracy")
             st.markdown("- Advanced data encryption and security measures")
             st.markdown("- Cloud-based backup and synchronization")
             if st.button("View Full Release Notes"):
-                st.info("Version 2.0 introduces comprehensive medical AI capabilities, enhanced security features, and improved user experience.")
+                st.info("Version 4.0 introduces comprehensive medical AI capabilities, enhanced security features, and improved user experience.")
 
         # Route to selected page
         if selected_page == "Chat Assistant":
@@ -688,10 +724,49 @@ def main() -> None:
             st.markdown('<div class="stContainer">', unsafe_allow_html=True)
             medical_dashboard()
             st.markdown('</div>', unsafe_allow_html=True)
+        elif selected_page == "Sex Education":
+            st.markdown('<div class="stContainer">', unsafe_allow_html=True)
+            st.subheader("Sex Education Chat")
+            st.write("Feel free to ask any questions related to sexual health and education.")
+            sex_education_chat(MedicalAIChatbot())
+            st.markdown('</div>', unsafe_allow_html=True)
             
     except Exception as e:
         logger.critical(f"Critical error in main: {str(e)}\n{traceback.format_exc()}")
         st.error("A critical error occurred. Please contact support.")
+
+def sex_education_chat(chatbot: MedicalAIChatbot) -> None:
+    try:
+        if "sex_chat_history" not in st.session_state:
+            st.session_state.sex_chat_history = []
+
+        # Display chat history
+        for message in st.session_state.sex_chat_history:            display_message(message["role"], message["content"], message.get("id"))
+
+        # Handle user input
+        user_input = st.chat_input("Ask a question about sexual health...")
+        if user_input:
+            message_id = str(uuid.uuid4())
+            st.session_state.sex_chat_history.append({
+                "role": "user", 
+                "content": user_input,
+                "id": message_id,
+                "timestamp": datetime.now().isoformat()
+            })
+            display_message("user", user_input)
+            
+            ai_response = chatbot.generate_response(st.session_state.sex_chat_history)
+            st.session_state.sex_chat_history.append({
+                "role": "assistant",
+                "content": ai_response,
+                "id": message_id,
+                "timestamp": datetime.now().isoformat()
+            })
+            display_message("assistant", ai_response, message_id)
+
+    except Exception as e:
+        logger.error(f"Error in sex education chat: {str(e)}\n{traceback.format_exc()}")
+        st.error("An error occurred. Please try refreshing the page.")
 
 if __name__ == "__main__":
     main()

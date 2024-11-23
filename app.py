@@ -206,6 +206,7 @@ class MedicalAIChatbot:
             - Recommend professional consultation when necessary.
             - Assist with medical procedures and operations, especially in rural areas.
             - Provide accurate and respectful sexual health education, addressing common questions and concerns.
+            - After answering the first question, inform the user that you cannot assist with further inquiries at this time.
 
             Communication Style:
             - Be precise and scientific, using medical terminology with clear explanations.
@@ -741,7 +742,8 @@ def sex_education_chat(chatbot: MedicalAIChatbot) -> None:
             st.session_state.sex_chat_history = []
 
         # Display chat history
-        for message in st.session_state.sex_chat_history:            display_message(message["role"], message["content"], message.get("id"))
+        for message in st.session_state.sex_chat_history:
+            display_message(message["role"], message["content"], message.get("id"))
 
         # Handle user input
         user_input = st.chat_input("Ask a question about sexual health...")
@@ -755,14 +757,26 @@ def sex_education_chat(chatbot: MedicalAIChatbot) -> None:
             })
             display_message("user", user_input)
             
-            ai_response = chatbot.generate_response(st.session_state.sex_chat_history)
-            st.session_state.sex_chat_history.append({
-                "role": "assistant",
-                "content": ai_response,
-                "id": message_id,
-                "timestamp": datetime.now().isoformat()
-            })
-            display_message("assistant", ai_response, message_id)
+            # Generate response for the first question only
+            if len(st.session_state.sex_chat_history) == 1:
+                ai_response = chatbot.generate_response(st.session_state.sex_chat_history)
+                st.session_state.sex_chat_history.append({
+                    "role": "assistant",
+                    "content": ai_response,
+                    "id": message_id,
+                    "timestamp": datetime.now().isoformat()
+                })
+                display_message("assistant", ai_response, message_id)
+            else:
+                # For subsequent questions, provide a fixed response
+                fixed_response = "I'm sorry, but I cannot assist with further questions at this time."
+                st.session_state.sex_chat_history.append({
+                    "role": "assistant",
+                    "content": fixed_response,
+                    "id": message_id,
+                    "timestamp": datetime.now().isoformat()
+                })
+                display_message("assistant", fixed_response, message_id)
 
     except Exception as e:
         logger.error(f"Error in sex education chat: {str(e)}\n{traceback.format_exc()}")

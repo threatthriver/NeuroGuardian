@@ -83,3 +83,19 @@
 2024-11-25 21:39:11,106 - __main__ - INFO - 24322 - 6185824256 - MedicalAIChatbot initialized successfully
 2024-11-25 21:39:13,502 - httpx - INFO - 24322 - 6185824256 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
 2024-11-25 21:39:19,379 - httpx - INFO - 24322 - 6185824256 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-25 21:42:22,720 - __main__ - INFO - 24322 - 6219476992 - System prompt loaded successfully
+2024-11-25 21:42:22,721 - __main__ - INFO - 24322 - 6219476992 - MedicalAIChatbot initialized successfully
+2024-11-25 21:42:37,923 - __main__ - INFO - 24322 - 6185824256 - System prompt loaded successfully
+2024-11-25 21:42:37,923 - __main__ - INFO - 24322 - 6185824256 - MedicalAIChatbot initialized successfully
+2024-11-25 21:42:39,104 - httpx - INFO - 24322 - 6185824256 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-25 21:42:47,503 - httpx - INFO - 24322 - 6185824256 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-25 21:44:53,877 - __main__ - INFO - 24322 - 6202650624 - System prompt loaded successfully
+2024-11-25 21:44:53,878 - __main__ - INFO - 24322 - 6202650624 - MedicalAIChatbot initialized successfully
+2024-11-25 21:46:50,693 - __main__ - INFO - 24322 - 6185824256 - System prompt loaded successfully
+2024-11-25 21:46:50,694 - __main__ - INFO - 24322 - 6185824256 - MedicalAIChatbot initialized successfully
+2024-11-25 21:46:56,594 - __main__ - INFO - 24322 - 6202650624 - System prompt loaded successfully
+2024-11-25 21:46:56,594 - __main__ - INFO - 24322 - 6202650624 - MedicalAIChatbot initialized successfully
+2024-11-25 21:46:57,568 - httpx - INFO - 24322 - 6202650624 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-25 21:47:03,765 - httpx - INFO - 24322 - 6202650624 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-25 21:49:45,074 - __main__ - INFO - 24322 - 6185824256 - System prompt loaded successfully
+2024-11-25 21:49:45,074 - __main__ - INFO - 24322 - 6185824256 - MedicalAIChatbot initialized successfully

@@ -610,15 +610,37 @@ class DoctorManager:
             return {}
 
 def format_markdown_content(content: str) -> str:
-    """Format content with enhanced markdown support."""
-    # Add support for medical terminology highlighting
-    content = re.sub(r'\b(diagnosis|treatment|symptoms?|medication)\b', r'**\1**', content, flags=re.IGNORECASE)
+    """Format content with enhanced markdown support and medical terminology highlighting."""
+    # Format medical terms and measurements
+    content = re.sub(r'\b(diagnosis|treatment|symptoms?|medication|prognosis|dosage)\b', r'**\1**', content, flags=re.IGNORECASE)
+    content = re.sub(r'(\d+)\s*(mg|ml|g|kg|mm\s*Hg|°[CF]|mmol/L)', r'`\1 \2`', content)
     
-    # Format medical measurements
-    content = re.sub(r'(\d+)\s*(mg|ml|g|kg|mm\s*Hg)', r'`\1 \2`', content)
+    # Format medical references and studies
+    content = re.sub(r'\[(Ref|Reference|Study)\s*:\s*([^\]]+)\]', r'> *\1: \2*', content)
     
-    # Format medical references
-    content = re.sub(r'\[(Ref|Reference)\s*:\s*([^\]]+)\]', r'> *\1: \2*', content)
+    # Format important warnings or notes
+    content = re.sub(r'(!+\s*Warning:.*?)(?=\n|$)', r'❗ **\1**', content, flags=re.IGNORECASE)
+    content = re.sub(r'(Note:.*?)(?=\n|$)', r'📝 *\1*', content, flags=re.IGNORECASE)
+    
+    # Format lists and bullet points
+    content = re.sub(r'(?m)^[-*]\s+(.*?)$', r'• \1', content)
+    
+    # Enhance medical terms with emojis
+    medical_emojis = {
+        r'\b(heart|cardiac)\b': '❤️',
+        r'\b(brain|neural|neuro)\b': '🧠',
+        r'\b(blood)\b': '🩸',
+        r'\b(medicine|medication|drug)\b': '💊',
+        r'\b(hospital|clinic)\b': '🏥',
+        r'\b(doctor|physician)\b': '👨‍⚕️',
+        r'\b(exercise|fitness)\b': '🏃‍♂️',
+        r'\b(diet|nutrition)\b': '🥗',
+        r'\b(sleep)\b': '😴',
+        r'\b(stress|anxiety)\b': '😰',
+    }
+    
+    for pattern, emoji in medical_emojis.items():
+        content = re.sub(pattern, f'{emoji} \\g<0>', content, flags=re.IGNORECASE)
     
     return content
 
@@ -649,137 +671,378 @@ def display_message(role: str, content: str, message_id: Optional[str] = None) -
 
 def chat_page(chatbot: MedicalAIChatbot):
     try:
-        # Add custom CSS for better markdown rendering
+        # Add custom CSS for enhanced styling
         st.markdown("""
             <style>
-                .chat-header {
-                    background: linear-gradient(135deg, #1e3c72, #2a5298);
-                    padding: 20px;
-                    border-radius: 10px;
-                    color: white;
-                    margin-bottom: 20px;
+                /* Global Styles */
+                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+                
+                * {
+                    font-family: 'Inter', sans-serif;
                 }
+                
+                /* Main Container */
+                .main {
+                    max-width: 1200px;
+                    margin: 0 auto;
+                    padding: 20px;
+                }
+                
+                /* Chat Header */
+                .chat-header {
+                    background: linear-gradient(135deg, #0A2647, #144272);
+                    padding: 25px;
+                    border-radius: 20px;
+                    color: white;
+                    margin-bottom: 30px;
+                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+                    text-align: center;
+                }
+                
                 .chat-header h2 {
                     margin: 0;
-                    font-size: 24px;
+                    font-size: 28px;
+                    font-weight: 600;
+                    letter-spacing: -0.5px;
                 }
+                
+                .chat-header p {
+                    margin-top: 10px;
+                    opacity: 0.9;
+                    font-size: 16px;
+                }
+                
+                /* Chat Messages */
+                .stChatMessage {
+                    background: white;
+                    border-radius: 20px;
+                    padding: 20px;
+                    margin: 15px 0;
+                    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+                    transition: transform 0.2s ease;
+                }
+                
+                .stChatMessage:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+                }
+                
+                .stChatMessage.user {
+                    background: linear-gradient(135deg, #E3F2FD, #BBDEFB);
+                    margin-left: 50px;
+                }
+                
+                .stChatMessage.assistant {
+                    background: white;
+                    margin-right: 50px;
+                    border-left: 4px solid #2A5298;
+                }
+                
+                /* Message Content */
                 .message-content {
                     font-size: 16px;
+                    line-height: 1.8;
+                    letter-spacing: 0.3px;
+                }
+                
+                /* Text Formatting */
+                .stChatMessage strong {
+                    color: #1565C0;
+                    font-weight: 600;
+                    padding: 2px 5px;
+                    border-radius: 4px;
+                    background: rgba(21, 101, 192, 0.1);
+                }
+                
+                .stChatMessage em {
+                    color: #546E7A;
+                    font-style: italic;
+                }
+                
+                .stChatMessage code {
+                    background: #F5F7F9;
+                    padding: 3px 8px;
+                    border-radius: 6px;
+                    font-family: 'Monaco', monospace;
+                    color: #E91E63;
+                    font-size: 14px;
+                    border: 1px solid rgba(233, 30, 99, 0.2);
+                }
+                
+                /* Blockquotes */
+                .stChatMessage blockquote {
+                    background: #F8F9FA;
+                    border-left: 4px solid #2A5298;
+                    margin: 15px 0;
+                    padding: 15px 20px;
+                    color: #455A64;
+                    font-style: italic;
+                    border-radius: 0 10px 10px 0;
+                }
+                
+                /* Lists */
+                .stChatMessage ul {
+                    list-style-type: none;
+                    padding-left: 25px;
+                }
+                
+                .stChatMessage li {
+                    margin: 12px 0;
+                    position: relative;
+                    padding-left: 25px;
+                }
+                
+                .stChatMessage li:before {
+                    content: "→";
+                    color: #2A5298;
+                    position: absolute;
+                    left: 0;
+                    font-weight: bold;
+                }
+                
+                /* Medical Summary */
+                .medical-summary {
+                    background: linear-gradient(135deg, #F5F7FA, #E4E7EB);
+                    border-radius: 15px;
+                    padding: 25px;
+                    margin: 20px 0;
+                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+                }
+                
+                .medical-summary h3 {
+                    color: #1565C0;
+                    font-size: 20px;
+                    font-weight: 600;
+                    margin-bottom: 15px;
+                    padding-bottom: 10px;
+                    border-bottom: 2px solid rgba(21, 101, 192, 0.2);
+                }
+                
+                .medical-summary ul {
+                    padding-left: 0;
+                }
+                
+                .medical-summary li {
+                    background: white;
+                    margin: 10px 0;
+                    padding: 12px 20px 12px 40px;
+                    border-radius: 10px;
+                    position: relative;
+                    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+                }
+                
+                .medical-summary li:before {
+                    content: "✓";
+                    color: #43A047;
+                    position: absolute;
+                    left: 15px;
+                    font-weight: bold;
+                }
+                
+                /* Special Text Styles */
+                .warning-text {
+                    background: #FFF3E0;
+                    color: #E65100;
+                    padding: 10px 15px;
+                    border-radius: 8px;
+                    border-left: 4px solid #E65100;
+                    margin: 10px 0;
+                }
+                
+                .note-text {
+                    background: #E3F2FD;
+                    color: #1565C0;
+                    padding: 10px 15px;
+                    border-radius: 8px;
+                    border-left: 4px solid #1565C0;
+                    margin: 10px 0;
+                }
+                
+                /* Typing Indicator */
+                .typing-indicator {
+                    background: rgba(42, 82, 152, 0.1);
+                    padding: 10px 20px;
+                    border-radius: 20px;
+                    display: inline-block;
+                }
+                
+                .typing-indicator span {
+                    display: inline-block;
+                    width: 8px;
+                    height: 8px;
+                    background: #2A5298;
+                    border-radius: 50%;
+                    margin: 0 3px;
+                    animation: typing 1.4s infinite ease-in-out;
+                }
+                
+                .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+                .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+                
+                @keyframes typing {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-6px); }
+                }
+                
+                /* Input Field */
+                .stTextInput input {
+                    border: 2px solid #E3E8EF;
+                    border-radius: 12px;
+                    padding: 12px 20px;
+                    font-size: 16px;
+                    transition: all 0.3s ease;
+                }
+                
+                .stTextInput input:focus {
+                    border-color: #2A5298;
+                    box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.1);
+                }
+                
+                /* Disclaimer */
+                .disclaimer {
+                    background: linear-gradient(135deg, #FFF8E1, #FFECB3);
+                    border-left: 4px solid #FFA000;
+                    padding: 20px;
+                    margin-top: 40px;
+                    border-radius: 12px;
+                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+                }
+                
+                .disclaimer p {
+                    color: #795548;
+                    margin: 0;
+                    font-size: 15px;
                     line-height: 1.6;
                 }
-                .message-content code {
-                    background-color: #f0f2f5;
-                    padding: 2px 6px;
-                    border-radius: 4px;
-                    font-family: 'Courier New', monospace;
+                
+                /* Scrollbar */
+                ::-webkit-scrollbar {
+                    width: 8px;
+                    height: 8px;
                 }
-                .message-content blockquote {
-                    border-left: 3px solid #2a5298;
-                    margin: 10px 0;
-                    padding-left: 15px;
-                    color: #666;
-                }
-                .ai-message {
-                    background-color: #f8f9fa;
-                    border-radius: 10px;
-                    padding: 15px;
-                    margin: 10px 0;
-                }
-                .user-message {
-                    background-color: #e3f2fd;
-                    border-radius: 10px;
-                    padding: 15px;
-                    margin: 10px 0;
-                }
-                .disclaimer {
-                    background-color: #fff3cd;
-                    border-left: 4px solid #ffc107;
-                    padding: 15px;
-                    margin-top: 30px;
+                
+                ::-webkit-scrollbar-track {
+                    background: #F1F1F1;
                     border-radius: 4px;
                 }
-                .medical-summary {
-                    background-color: #e8f5e9;
-                    border-radius: 8px;
-                    padding: 15px;
-                    margin: 10px 0;
+                
+                ::-webkit-scrollbar-thumb {
+                    background: #2A5298;
+                    border-radius: 4px;
+                }
+                
+                ::-webkit-scrollbar-thumb:hover {
+                    background: #1565C0;
                 }
             </style>
         """, unsafe_allow_html=True)
 
-        st.markdown("""
-            <div class="chat-header">
-                <h2>🧠 NeuroGuardian Medical Assistant</h2>
-                <p>Your AI medical assistant for accurate health information and guidance.</p>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # Initialize chat history
+        # Welcome message with improved formatting
+        welcome_message = """
+        👋 Hello! I'm your **NeuroGuardian Medical Assistant**. 
+        
+        I'm here to help you with:
+        • Medical information and guidance
+        • Symptom assessment
+        • Health recommendations
+        • Medical term explanations
+        
+        📝 *Please note that I provide general medical information only. Always consult healthcare professionals for specific medical advice.*
+        
+        How can I assist you today?
+        """
+        
+        # Initialize chat history with welcome message
         if "messages" not in st.session_state:
             st.session_state.messages = []
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": welcome_message,
+                "avatar": "🤖"
+            })
 
-        # Display chat messages
+        # Display chat messages using Streamlit's chat interface
         for message in st.session_state.messages:
-            display_message(message["role"], message["content"], message.get("id"))
+            with st.chat_message(message["role"], avatar=message.get("avatar")):
+                st.markdown(format_markdown_content(message["content"]))
 
         # Chat input
-        if prompt := st.chat_input("Ask me about any medical concerns..."):
-            # Add user message to chat history
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            display_message("user", prompt)
+        if prompt := st.chat_input("Type your medical question here...", key="chat_input"):
+            # Add user message
+            st.session_state.messages.append({"role": "user", "content": prompt, "avatar": "🧑‍⚕️"})
             
-            # Get AI response
-            with st.chat_message("assistant"):
+            # Display user message
+            with st.chat_message("user", avatar="🧑‍⚕️"):
+                st.markdown(prompt)
+
+            # Display assistant response with typing indicator
+            with st.chat_message("assistant", avatar="🤖"):
                 message_placeholder = st.empty()
-                full_response = ""
                 
-                with st.spinner("Analyzing your question..."):
-                    try:
+                try:
+                    with st.spinner(""):
+                        # Show typing indicator
+                        message_placeholder.markdown("""
+                            <div class="typing-indicator">
+                                <span></span><span></span><span></span>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Get response from chatbot
                         response = chatbot.get_response(st.session_state.messages)
+                        full_response = ""
                         
                         # Simulate streaming response
                         for chunk in response.split():
                             full_response += chunk + " "
-                            time.sleep(0.02)  # Faster response
-                            message_placeholder.markdown(full_response + "▌")
+                            time.sleep(0.02)
+                            message_placeholder.markdown(format_markdown_content(full_response + "▌"))
                         
-                        message_placeholder.markdown(full_response)
+                        # Display final response
+                        message_placeholder.markdown(format_markdown_content(full_response))
                         
-                        # Add assistant response to chat history
-                        st.session_state.messages.append({"role": "assistant", "content": full_response})
-                        
+                        # Add to chat history
+                        st.session_state.messages.append({
+                            "role": "assistant",
+                            "content": full_response,
+                            "avatar": "🤖"
+                        })
+
                         # Analyze medical content
                         analysis = chatbot.analyze_medical_text(full_response)
                         
-                        # Display relevant medical information if available
+                        # Display medical summary if available
                         if any(analysis.values()):
-                            with st.expander("📋 Medical Summary"):
+                            with st.expander("📋 Medical Summary", expanded=True):
                                 st.markdown('<div class="medical-summary">', unsafe_allow_html=True)
+                                
                                 if analysis.get("conditions"):
-                                    st.markdown("### 🏥 Conditions")
+                                    st.markdown("### 🏥 Identified Conditions")
                                     for condition in analysis["conditions"]:
                                         st.markdown(f"* **{condition}**")
                                 
                                 if analysis.get("medications"):
-                                    st.markdown("### 💊 Medications")
+                                    st.markdown("### 💊 Mentioned Medications")
                                     for med in analysis["medications"]:
                                         st.markdown(f"* `{med}`")
                                 
                                 if analysis.get("recommendations"):
-                                    st.markdown("### 📋 Recommendations")
+                                    st.markdown("### 📋 Key Recommendations")
                                     for rec in analysis["recommendations"]:
                                         st.markdown(f"* _{rec}_")
+                                
                                 st.markdown('</div>', unsafe_allow_html=True)
-                    except Exception as e:
-                        error_msg = "I apologize, but I encountered an error. Please try rephrasing your question."
-                        message_placeholder.error(error_msg)
-                        logger.error(f"Chat response error: {str(e)}")
+
+                except Exception as e:
+                    error_msg = "I apologize, but I encountered an error. Please try rephrasing your question."
+                    message_placeholder.error(error_msg)
+                    logger.error(f"Chat response error: {str(e)}")
 
         # Medical disclaimer
         st.markdown("""
             <div class="disclaimer">
-                <p><strong>Medical Disclaimer:</strong> This AI provides general medical information only. 
-                Always consult healthcare professionals for medical decisions.</p>
+                <p><strong>⚕️ Medical Disclaimer:</strong> This AI provides general medical information only. 
+                Always consult qualified healthcare professionals for medical decisions.</p>
             </div>
         """, unsafe_allow_html=True)
 

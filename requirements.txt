@@ -8,3 +8,7 @@ pandas>=2.2.0
 pydantic>=2.6.0
 tenacity>=8.2.0
 requests>=2.31.0
+bleach>=6.1.0
+python-jose[cryptography]>=3.3.0
+secure>=0.3.0
+ratelimit>=2.2.1

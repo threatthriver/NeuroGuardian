@@ -6,7 +6,7 @@ from cerebras.cloud.sdk import Cerebras
 from dotenv import load_dotenv
 import pandas as pd
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import csv
 from pathlib import Path
@@ -15,24 +15,130 @@ import io
 import logging
 from typing import Dict, List, Optional, Union
 import traceback
+from pydantic import BaseModel, EmailStr, constr, validator
+from tenacity import retry, stop_after_attempt, wait_exponential
+import bleach
+import secrets
+from functools import wraps
+import time
 
-# Configure logging
+# Configure logging with more detailed format
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(process)d - %(thread)d - %(message)s',
     handlers=[
         logging.FileHandler('app.log'),
-        logging.StreamHandler()
+        logging.StreamHandler(),
+        logging.FileHandler('security.log')  # Separate security log
     ]
 )
 logger = logging.getLogger(__name__)
+
+# Rate limiting decorator
+def rate_limit(max_requests: int, window: int):
+    requests_history = {}
+    
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            now = time.time()
+            client_id = st.session_state.get('client_id', 'default')
+            
+            if client_id not in requests_history:
+                requests_history[client_id] = []
+            
+            # Clean old requests
+            requests_history[client_id] = [req_time for req_time in requests_history[client_id] 
+                                         if now - req_time < window]
+            
+            if len(requests_history[client_id]) >= max_requests:
+                logger.warning(f"Rate limit exceeded for client {client_id}")
+                raise Exception("Rate limit exceeded. Please try again later.")
+            
+            requests_history[client_id].append(now)
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+# Secure session management
+def init_session():
+    if 'session_id' not in st.session_state:
+        st.session_state.session_id = secrets.token_urlsafe(32)
+    if 'client_id' not in st.session_state:
+        st.session_state.client_id = secrets.token_urlsafe(16)
+    if 'last_activity' not in st.session_state:
+        st.session_state.last_activity = datetime.now()
+
+# Session timeout checker
+def check_session_timeout(timeout_minutes: int = 30):
+    if 'last_activity' in st.session_state:
+        if datetime.now() - st.session_state.last_activity > timedelta(minutes=timeout_minutes):
+            # Clear session
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            return True
+    st.session_state.last_activity = datetime.now()
+    return False
+
+# Input validation models
+class PatientRecord(BaseModel):
+    name: constr(min_length=2, max_length=100)
+    age: int
+    medical_history: constr(max_length=5000)
+    conditions: constr(max_length=1000)
+    medications: constr(max_length=1000)
+
+    @validator('age')
+    def validate_age(cls, v):
+        if v < 0 or v > 150:
+            raise ValueError('Age must be between 0 and 150')
+        return v
+
+    @validator('name')
+    def sanitize_name(cls, v):
+        return bleach.clean(v)
+
+# Enhanced encryption with key rotation
+class EncryptionManager:
+    def __init__(self, key_file: Path = Path("encryption.key")):
+        self.key_file = key_file
+        self.key_rotation_interval = timedelta(days=30)
+        self.initialize_encryption()
+
+    def initialize_encryption(self):
+        try:
+            if not self.key_file.exists() or self._should_rotate_key():
+                self._generate_new_key()
+            self.key = self.key_file.read_bytes()
+            self.fernet = Fernet(self.key)
+        except Exception as e:
+            logger.critical(f"Encryption initialization failed: {str(e)}")
+            raise
+
+    def _should_rotate_key(self) -> bool:
+        return (self.key_file.stat().st_mtime < 
+                (datetime.now() - self.key_rotation_interval).timestamp())
+
+    def _generate_new_key(self):
+        key = Fernet.generate_key()
+        self.key_file.write_bytes(key)
+        logger.info("Generated new encryption key")
+
+    def encrypt(self, data: str) -> bytes:
+        return self.fernet.encrypt(data.encode())
+
+    def decrypt(self, data: bytes) -> str:
+        return self.fernet.decrypt(data).decode()
+
+# Initialize encryption manager
+encryption_manager = EncryptionManager()
 
 # Load environment variables with error handling
 def load_environment():
     try:
         load_dotenv()
-        if not os.getenv("GROQ_API_KEY") and not os.getenv("CEREBRAS_API_KEY"):
-            raise EnvironmentError("GROQ_API_KEY or CEREBRAS_API_KEY not found in environment variables")
+        if not os.getenv("GROQ_API_KEY"):
+            raise EnvironmentError("GROQ_API_KEY not found in environment variables")
     except Exception as e:
         logger.error(f"Failed to load environment variables: {str(e)}")
         raise
@@ -179,189 +285,148 @@ st.markdown("""
 class MedicalAIChatbot:
     def __init__(self):
         try:
-            api_key = os.getenv("GROQ_API_KEY")
-            if not api_key:
-                raise EnvironmentError("API key not found")
-            self.client = Groq(api_key=api_key)
+            self.groq_api_key = os.getenv("GROQ_API_KEY")
+            if not self.groq_api_key:
+                raise EnvironmentError("GROQ_API_KEY not found")
+            
+            self.client = Groq(api_key=self.groq_api_key)
             self._load_system_prompt()
+            self.request_timeout = 30
             logger.info("MedicalAIChatbot initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize MedicalAIChatbot: {str(e)}")
-            st.error("Failed to initialize chatbot. Please check logs for details.")
             raise
 
     def _load_system_prompt(self):
         try:
             with open('system_prompt.txt', 'r') as f:
-                self.system_prompt = f.read()
-        except FileNotFoundError:
-            self.system_prompt = """You are NeuroGuardian, an advanced AI medical companion developed by IntellijMind. Your primary role is to provide accurate, clear, and empathetic medical assistance while adhering to strict medical ethics and guidelines.
-
-Core Medical Competencies:
-1. Clinical Knowledge & Assessment
-   - Understand and explain common medical conditions
-   - Recognize symptom patterns and potential diagnoses
-   - Provide evidence-based medical information
-   - Guide through basic health assessments
-   - Explain laboratory results and medical terminology
-
-2. Emergency Medicine Support
-   - Identify life-threatening situations
-   - Provide immediate first-aid guidance
-   - Assist in emergency decision-making
-   - Guide emergency response protocols
-   - Coordinate with emergency services
-
-3. Chronic Disease Management
-   - Monitor disease progression
-   - Explain treatment options
-   - Support medication adherence
-   - Track symptoms and vital signs
-   - Provide lifestyle modification guidance
-
-4. Mental Health Care
-   - Screen for mental health conditions
-   - Offer coping strategies and resources
-   - Support crisis intervention
-   - Guide through anxiety and stress management
-   - Provide sleep hygiene recommendations
-
-5. Preventive Medicine
-   - Recommend health screenings
-   - Provide vaccination information
-   - Guide through lifestyle modifications
-   - Support smoking cessation
-   - Offer nutrition and exercise guidance
-
-6. Women's Health
-   - Support reproductive health
-   - Guide through pregnancy care
-   - Explain menstrual health
-   - Discuss contraception options
-   - Address menopausal concerns
-
-7. Sexual Health Education
-   - Provide comprehensive sex education
-   - Discuss STI prevention and treatment
-   - Address reproductive concerns
-   - Support gender identity questions
-   - Guide through sexual health screenings
-
-8. Pediatric Care Support
-   - Guide child development
-   - Address common childhood illnesses
-   - Support vaccination schedules
-   - Monitor growth and development
-   - Handle pediatric emergencies
-
-9. Geriatric Care
-   - Support aging-related concerns
-   - Monitor cognitive health
-   - Guide fall prevention
-   - Address mobility issues
-   - Support medication management
-
-Medical Communication Protocol:
-1. Initial Assessment
-   - Gather relevant medical history
-   - Understand current symptoms
-   - Assess severity and urgency
-   - Consider risk factors
-   - Document key concerns
-
-2. Information Delivery
-   - Use clear, accessible language
-   - Provide structured explanations
-   - Include relevant medical context
-   - Offer visual aids when helpful
-   - Confirm understanding
-
-3. Action Planning
-   - Develop clear next steps
-   - Set realistic health goals
-   - Create monitoring plans
-   - Establish follow-up protocols
-   - Define emergency procedures
-
-Safety Guidelines:
-- Always identify as an AI medical assistant
-- Maintain medical accuracy and currency
-- Respect patient privacy and confidentiality
-- Recognize scope of practice limitations
-- Defer to healthcare professionals when needed
-- Document all interactions securely
-- Follow medical ethics principles
-- Prioritize patient safety above all
-
-Response Structure:
-1. Acknowledge and validate concerns
-2. Gather necessary information
-3. Provide evidence-based guidance
-4. Outline practical next steps
-5. Include relevant medical disclaimers
-6. Offer additional resources
-7. Ensure clear follow-up plan
-
-Remember: You are a supportive medical AI assistant working alongside healthcare professionals to enhance patient care and understanding."""
-            logger.warning("System prompt file not found, using default prompt")
-
-    def generate_response(self, messages: List[Dict[str, str]], patient_data: Optional[Dict[str, str]] = None) -> str:
-        try:
-            context = self.system_prompt
-            if patient_data:
-                context += self._format_patient_context(patient_data)
-            
-            cleaned_messages = [{"role": msg["role"], "content": msg["content"]} for msg in messages]
-            full_messages = [{"role": "system", "content": context}] + cleaned_messages
-            
-            with st.spinner("Generating response..."):
-                try:
-                    completion = self.client.chat.completions.create(
-                        model="llama-3.2-11b-vision-preview",
-                        messages=full_messages,
-                        temperature=0.7,  # Adjusted for more focused responses
-                        max_tokens=1500,  # Increased token limit for more detailed responses
-                        top_p=0.9,
-                        stream=False,
-                    )
-                except RateLimitError:
-                    api_key = os.getenv("CEREBRAS_API_KEY")
-                    if not api_key:
-                        raise EnvironmentError("CEREBRAS_API_KEY not found")
-                    cerebras_client = Cerebras(api_key=api_key)
-                    completion = cerebras_client.chat.completions.create(
-                        model="llama-3.2-11b-vision-preview",
-                        messages=full_messages,
-                        temperature=0.7,  # Adjusted for more focused responses
-                        max_tokens=1500,  # Increased token limit for more detailed responses
-                        top_p=0.9,
-                        stream=False,
-                    )
-            return completion.choices[0].message.content.strip()
-        except RateLimitError:
-            error_msg = "Rate limit exceeded. Please try again in a few moments."
-            logger.warning("Rate limit exceeded")
-            st.warning(error_msg)
-            return error_msg
-        except APIError as e:
-            error_msg = f"API Error: {str(e)}"
-            logger.error(f"API Error: {str(e)}")
-            st.error(error_msg)
-            return error_msg
+                self.system_prompt = f.read().strip()
+            logger.info("System prompt loaded successfully")
         except Exception as e:
-            error_msg = "An unexpected error occurred. Please try again later."
-            logger.error(f"Unexpected error in generate_response: {str(e)}\n{traceback.format_exc()}")
-            st.error(error_msg)
-            return error_msg
+            logger.error(f"Error loading system prompt: {str(e)}")
+            raise
 
-    def _format_patient_context(self, patient_data: Dict[str, str]) -> str:
-        return f"\nPatient Context:\nName: {patient_data.get('name', 'N/A')}\nAge: {patient_data.get('age', 'N/A')}\nMedical History: {patient_data.get('medical_history', 'N/A')}\nCurrent Conditions: {patient_data.get('current_conditions', 'N/A')}\nMedications: {patient_data.get('current_medications', 'N/A')}"
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    def get_response(self, messages: List[Dict[str, str]], context: Optional[Dict] = None) -> str:
+        try:
+            # Sanitize input
+            sanitized_messages = [
+                {
+                    "role": bleach.clean(msg["role"]),
+                    "content": bleach.clean(msg["content"])
+                }
+                for msg in messages
+            ]
+            
+            # Add system prompt and context
+            full_messages = [{"role": "system", "content": self.system_prompt}]
+            
+            # Add medical context if available
+            if context:
+                context_prompt = self._format_medical_context(context)
+                full_messages.append({"role": "system", "content": context_prompt})
+            
+            # Add conversation history
+            full_messages.extend(sanitized_messages)
+            
+            # Get response using Llama model
+            response = self.client.chat.completions.create(
+                model="llama-3.2-11b-vision-preview",
+                messages=full_messages,
+                temperature=0.7,  # Balanced between creativity and accuracy
+                max_tokens=2048,
+                top_p=0.9,
+                stream=False,
+                timeout=self.request_timeout
+            )
+            
+            return response.choices[0].message.content
+                
+        except Exception as e:
+            logger.error(f"Error getting AI response: {str(e)}")
+            raise
+
+    def _format_medical_context(self, context: Dict) -> str:
+        context_parts = []
+        
+        if context.get("patient_info"):
+            context_parts.append(f"Patient Information:\n{context['patient_info']}")
+        
+        if context.get("medical_history"):
+            context_parts.append(f"Medical History:\n{context['medical_history']}")
+        
+        if context.get("current_symptoms"):
+            context_parts.append(f"Current Symptoms:\n{context['current_symptoms']}")
+        
+        if context.get("medications"):
+            context_parts.append(f"Current Medications:\n{context['medications']}")
+        
+        if context.get("allergies"):
+            context_parts.append(f"Allergies:\n{context['allergies']}")
+        
+        if context.get("vital_signs"):
+            context_parts.append(f"Vital Signs:\n{context['vital_signs']}")
+        
+        return "\n\n".join(context_parts)
+
+    def analyze_medical_text(self, text: str) -> Dict:
+        """Analyzes medical text for key information and entities."""
+        try:
+            analysis_prompt = f"""Analyze this medical text and extract key information:
+            
+            Text: {text}
+            
+            Extract:
+            1. Symptoms
+            2. Conditions
+            3. Medications
+            4. Recommendations
+            """
+            
+            response = self.get_response([{"role": "user", "content": analysis_prompt}])
+            return self._parse_medical_analysis(response)
+        except Exception as e:
+            logger.error(f"Error analyzing medical text: {str(e)}")
+            return {}
+
+    def _parse_medical_analysis(self, response: str) -> Dict:
+        """Parses the AI response into structured medical data."""
+        try:
+            sections = {
+                "symptoms": [],
+                "conditions": [],
+                "medications": [],
+                "recommendations": []
+            }
+            
+            current_section = None
+            for line in response.split("\n"):
+                line = line.strip()
+                if not line:
+                    continue
+                
+                lower_line = line.lower()
+                if "symptoms:" in lower_line:
+                    current_section = "symptoms"
+                elif "conditions:" in lower_line:
+                    current_section = "conditions"
+                elif "medications:" in lower_line:
+                    current_section = "medications"
+                elif "recommendations:" in lower_line:
+                    current_section = "recommendations"
+                elif current_section and line.startswith("-"):
+                    sections[current_section].append(line[1:].strip())
+            
+            return sections
+        except Exception as e:
+            logger.error(f"Error parsing medical analysis: {str(e)}")
+            return {}
 
 class PatientRecordManager:
     @staticmethod
     def save_to_file(records: Dict) -> None:
         try:
-            encrypted_data = fernet.encrypt(json.dumps(records).encode())
+            encrypted_data = encryption_manager.encrypt(json.dumps(records))
             backup_path = Path("patient_records.bak")
             file_path = Path("patient_records.enc")
             
@@ -394,7 +459,7 @@ class PatientRecordManager:
                 
             with open(file_path, "rb") as f:
                 encrypted_data = f.read()
-            decrypted_data = fernet.decrypt(encrypted_data)
+            decrypted_data = encryption_manager.decrypt(encrypted_data)
             records = json.loads(decrypted_data)
             logger.info(f"Successfully loaded {len(records)} patient records")
             return records
@@ -502,7 +567,7 @@ class DoctorManager:
     @staticmethod
     def save_to_file(records: Dict) -> None:
         try:
-            encrypted_data = fernet.encrypt(json.dumps(records).encode())
+            encrypted_data = encryption_manager.encrypt(json.dumps(records))
             backup_path = Path("doctor_records.bak")
             file_path = Path("doctor_records.enc")
             
@@ -535,7 +600,7 @@ class DoctorManager:
                 
             with open(file_path, "rb") as f:
                 encrypted_data = f.read()
-            decrypted_data = fernet.decrypt(encrypted_data)
+            decrypted_data = encryption_manager.decrypt(encrypted_data)
             records = json.loads(decrypted_data)
             logger.info(f"Successfully loaded {len(records)} doctor records")
             return records
@@ -553,108 +618,88 @@ def display_message(role: str, content: str, message_id: Optional[str] = None) -
         logger.error(f"Failed to display message: {str(e)}")
         st.error("Failed to display message")
 
-def chat_page(chatbot: MedicalAIChatbot) -> None:
+def chat_page(chatbot: MedicalAIChatbot):
     try:
-        st.subheader("Medical Consultation Chat")
-        
-        # Initialize session state
-        if "chat_history" not in st.session_state:
-            st.session_state.chat_history = []
-        if "feedback" not in st.session_state:
-            st.session_state.feedback = {}
-        if "confirm_clear" not in st.session_state:
-            st.session_state.confirm_clear = False
-        
-        # Patient selection with improved search
-        selected_patient = None
-        if st.session_state.get("patient_records"):
-            patient_names = ["None"] + [record["name"] for record in st.session_state.patient_records.values()]
-            search_term = st.text_input("Search Patients (by name):", key="patient_search")
-            if search_term:
-                filtered_names = [name for name in patient_names if search_term.lower() in name.lower()]
-                selected_name = st.selectbox("Select Patient:", filtered_names)
-            else:
-                selected_name = st.selectbox("Select Patient:", patient_names)
+        st.markdown("""
+            <div class="chat-header">
+                <h2>🧠 NeuroGuardian Medical Assistant</h2>
+                <p>Your AI medical assistant for accurate health information and guidance.</p>
+            </div>
+        """, unsafe_allow_html=True)
 
-            if selected_name != "None":
-                selected_patient = next((record for record in st.session_state.patient_records.values() 
-                                      if record["name"] == selected_name), None)
-                st.info(f"Chatting with context for patient: {selected_name}")
-        
-        # Display chat history
-        for message in st.session_state.chat_history:
-            display_message(message["role"], message["content"], message.get("id"))
+        # Initialize chat history
+        if "messages" not in st.session_state:
+            st.session_state.messages = []
 
-        # Handle user input
-        user_input = st.chat_input("Ask a medical question or describe symptoms...")
-        if user_input:
-            message_id = str(uuid.uuid4())
-            st.session_state.chat_history.append({
-                "role": "user", 
-                "content": user_input,
-                "id": message_id,
-                "timestamp": datetime.now().isoformat()
-            })
-            display_message("user", user_input)
-            
-            ai_response = chatbot.generate_response(st.session_state.chat_history, selected_patient)
-            st.session_state.chat_history.append({
-                "role": "assistant",
-                "content": ai_response,
-                "id": message_id,
-                "timestamp": datetime.now().isoformat()
-            })
-            display_message("assistant", ai_response, message_id)
-        
-        # Clear chat button with improved confirmation
-        col1, col2 = st.columns([1, 4])
-        with col1:
-            if st.button("Clear Chat", type="primary", disabled=not st.session_state.chat_history):
-                st.session_state.confirm_clear = True
-        
-        with col2:
-            if st.session_state.confirm_clear:
-                st.warning("Are you sure you want to clear the chat history?")
-                if st.button("Yes, Clear Chat", type="primary"):
-                    st.session_state.chat_history = []
-                    st.session_state.confirm_clear = False
-                    st.rerun()
-                if st.button("Cancel"):
-                    st.session_state.confirm_clear = False
-                    st.rerun()
+        # Display chat messages
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
-        # Feedback system in sidebar
-        with st.sidebar:
-            st.markdown("### Message Feedback")
-            if st.session_state.chat_history:
-                latest_message = st.session_state.chat_history[-1]
-                if latest_message["role"] == "assistant":
-                    message_id = latest_message["id"]
-                    st.markdown("#### Rate the last response:")
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        if st.button("👍 Helpful"):
-                            st.session_state.feedback[message_id] = {
-                                "rating": "helpful",
-                                "timestamp": datetime.now().isoformat()
-                            }
-                            st.success("Thank you for your feedback!")
-                    
-                    with col2:
-                        if st.button("👎 Not Helpful"):
-                            st.session_state.feedback[message_id] = {
-                                "rating": "not_helpful",
-                                "timestamp": datetime.now().isoformat()
-                            }
-                            feedback = st.text_area("How can we improve?")
-                            if feedback:
-                                st.session_state.feedback[message_id]["comment"] = feedback
-                                st.success("Thank you for your detailed feedback!")
+        # Chat input
+        if prompt := st.chat_input("Ask me about any medical concerns..."):
+            # Add user message to chat history
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            with st.chat_message("user"):
+                st.markdown(prompt)
+
+            # Get AI response
+            with st.chat_message("assistant"):
+                message_placeholder = st.empty()
+                full_response = ""
+                
+                with st.spinner("Analyzing your question..."):
+                    try:
+                        response = chatbot.get_response(st.session_state.messages)
+                        
+                        # Simulate streaming response
+                        for chunk in response.split():
+                            full_response += chunk + " "
+                            time.sleep(0.02)  # Faster response
+                            message_placeholder.markdown(full_response + "▌")
+                        
+                        message_placeholder.markdown(full_response)
+                        
+                        # Add assistant response to chat history
+                        st.session_state.messages.append({"role": "assistant", "content": full_response})
+                        
+                        # Analyze medical content
+                        analysis = chatbot.analyze_medical_text(full_response)
+                        
+                        # Display relevant medical information if available
+                        if any(analysis.values()):
+                            with st.expander("📋 Medical Summary"):
+                                if analysis.get("conditions"):
+                                    st.markdown("**Conditions:**")
+                                    for condition in analysis["conditions"]:
+                                        st.markdown(f"• {condition}")
                                 
+                                if analysis.get("medications"):
+                                    st.markdown("**Medications:**")
+                                    for med in analysis["medications"]:
+                                        st.markdown(f"• {med}")
+                                
+                                if analysis.get("recommendations"):
+                                    st.markdown("**Recommendations:**")
+                                    for rec in analysis["recommendations"]:
+                                        st.markdown(f"• {rec}")
+                        
+                    except Exception as e:
+                        error_msg = "I apologize, but I encountered an error. Please try rephrasing your question."
+                        message_placeholder.error(error_msg)
+                        logger.error(f"Chat response error: {str(e)}")
+
+        # Medical disclaimer
+        st.markdown("""
+            <div class="disclaimer">
+                <p><strong>Medical Disclaimer:</strong> This AI provides general medical information only. 
+                Always consult healthcare professionals for medical decisions.</p>
+            </div>
+        """, unsafe_allow_html=True)
+
     except Exception as e:
-        logger.error(f"Error in chat page: {str(e)}\n{traceback.format_exc()}")
-        st.error("An error occurred. Please try refreshing the page.")
+        logger.error(f"Chat page error: {str(e)}")
+        st.error("An error occurred. Please refresh the page.")
 
 def patient_records_page() -> None:
     try:
@@ -768,60 +813,57 @@ def medical_dashboard() -> None:
 
 def main() -> None:
     try:
-        st.markdown('<div class="main-header"><h1>🧠 NeuroGuardian: Advanced Medical AI Assistant</h1></div>', 
-                   unsafe_allow_html=True)
-
-        pages = ["Chat Assistant", "Patient Records", "Medical Dashboard", "Sex Education"]
-        selected_page = st.sidebar.selectbox("Navigation", pages)
-
-        st.sidebar.markdown('<div class="sidebar-content"><h2>NeuroGuardian by IntellijMind</h2></div>', 
-                          unsafe_allow_html=True)
+        # Initialize session
+        init_session()
         
-        # Display version info and updates in sidebar
-        with st.sidebar:
-            st.markdown("### Latest Updates (Version 4.0):")
-            st.markdown("#### Major Improvements:")
-            st.markdown("- Enhanced AI model with improved accuracy and response time")
-            st.markdown("- Real-time patient vitals monitoring system")
-            st.markdown("- Secure electronic health records (EHR) management")
-            st.markdown("- Multi-language support for global accessibility")
-            st.markdown("#### New Features:")
-            st.markdown("- Intelligent symptom analysis and prediction")
-            st.markdown("- Automated medical report generation")
-            st.markdown("- Emergency response protocol system")
-            st.markdown("- Integrated telemedicine capabilities")
-            st.markdown("- Comprehensive sexual health education")
-            st.markdown("#### Technical Improvements:")
-            st.markdown("- Enhanced UI/UX with new color palette and layout")
-            st.markdown("- Improved response time and accuracy")
-            st.markdown("- Advanced data encryption and security measures")
-            st.markdown("- Cloud-based backup and synchronization")
-            if st.button("View Full Release Notes"):
-                st.info("Version 4.0 introduces comprehensive medical AI capabilities, enhanced security features, and improved user experience.")
+        # Check session timeout
+        if check_session_timeout():
+            st.warning("Your session has expired. Please refresh the page.")
+            return
 
-        # Route to selected page
-        if selected_page == "Chat Assistant":
-            st.markdown('<div class="stContainer">', unsafe_allow_html=True)
-            chat_page(MedicalAIChatbot())
-            st.markdown('</div>', unsafe_allow_html=True)
-        elif selected_page == "Patient Records":
-            st.markdown('<div class="stContainer">', unsafe_allow_html=True)
-            patient_records_page()
-            st.markdown('</div>', unsafe_allow_html=True)
-        elif selected_page == "Medical Dashboard":
-            st.markdown('<div class="stContainer">', unsafe_allow_html=True)
-            medical_dashboard()
-            st.markdown('</div>', unsafe_allow_html=True)
-        elif selected_page == "Sex Education":
-            st.markdown('<div class="stContainer">', unsafe_allow_html=True)
-            st.subheader("Sex Education Chat")
-            st.write("Feel free to ask any questions related to sexual health and education.")
-            sex_education_chat(MedicalAIChatbot())
-            st.markdown('</div>', unsafe_allow_html=True)
-            
+        # Set secure headers
+        st.markdown("""
+            <meta http-equiv="X-Frame-Options" content="DENY">
+            <meta http-equiv="X-Content-Type-Options" content="nosniff">
+            <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';">
+        """, unsafe_allow_html=True)
+
+        st.markdown("""
+            <div class='main-header'>
+                <h1>🧠 NeuroGuardian</h1>
+                <p>Your Trusted Medical AI Assistant</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Initialize chatbot with error handling
+        try:
+            chatbot = MedicalAIChatbot()
+        except Exception as e:
+            st.error("Failed to initialize the chatbot. Please try again later.")
+            logger.error(f"Chatbot initialization error: {str(e)}")
+            return
+
+        # Navigation with rate limiting
+        @rate_limit(max_requests=50, window=60)
+        def handle_navigation():
+            menu = ["Chat", "Patient Records", "Medical Dashboard", "Sex Education"]
+            choice = st.sidebar.selectbox("Navigation", menu)
+
+            if choice == "Chat":
+                chat_page(chatbot)
+            elif choice == "Patient Records":
+                patient_records_page()
+            elif choice == "Medical Dashboard":
+                medical_dashboard()
+            elif choice == "Sex Education":
+                sex_education_chat(chatbot)
+
+        handle_navigation()
+
     except Exception as e:
-        logger.critical(f"Critical error in main: {str(e)}\n{traceback.format_exc()}")
-        st.error("A critical error occurred. Please contact support.")
+        logger.error(f"Main application error: {str(e)}\n{traceback.format_exc()}")
+        st.error("An unexpected error occurred. Please try again later.")
 
 def sex_education_chat(chatbot: MedicalAIChatbot) -> None:
     try:
@@ -845,7 +887,7 @@ def sex_education_chat(chatbot: MedicalAIChatbot) -> None:
             display_message("user", user_input)
             
             # Generate response for all questions
-            ai_response = chatbot.generate_response(st.session_state.sex_chat_history)
+            ai_response = chatbot.get_response(st.session_state.sex_chat_history)
             st.session_state.sex_chat_history.append({
                 "role": "assistant",
                 "content": ai_response,

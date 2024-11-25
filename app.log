@@ -892,3 +892,74 @@ Environment variables loaded successfully
 Environment variables loaded successfully
 Environment variables loaded successfully
 Environment variables loaded successfully
+2024-11-24 15:06:03,389 - __main__ - WARNING - 4506 - 6208516096 - System prompt file not found, using default prompt
+2024-11-24 15:06:03,389 - __main__ - INFO - 4506 - 6208516096 - MedicalAIChatbot initialized successfully
+2024-11-24 15:06:06,621 - __main__ - WARNING - 4506 - 6243315712 - System prompt file not found, using default prompt
+2024-11-24 15:06:06,621 - __main__ - INFO - 4506 - 6243315712 - MedicalAIChatbot initialized successfully
+2024-11-24 15:06:07,713 - __main__ - WARNING - 4506 - 6208516096 - System prompt file not found, using default prompt
+2024-11-24 15:06:07,714 - __main__ - INFO - 4506 - 6208516096 - MedicalAIChatbot initialized successfully
+2024-11-24 15:06:20,608 - __main__ - WARNING - 4506 - 6242742272 - System prompt file not found, using default prompt
+2024-11-24 15:06:20,608 - __main__ - INFO - 4506 - 6242742272 - MedicalAIChatbot initialized successfully
+2024-11-24 15:06:22,737 - __main__ - WARNING - 4506 - 6208516096 - System prompt file not found, using default prompt
+2024-11-24 15:06:22,738 - __main__ - INFO - 4506 - 6208516096 - MedicalAIChatbot initialized successfully
+2024-11-24 15:06:22,738 - __main__ - INFO - 4506 - 6208516096 - No existing patient records found
+2024-11-24 15:06:24,166 - __main__ - WARNING - 4506 - 6242742272 - System prompt file not found, using default prompt
+2024-11-24 15:06:24,166 - __main__ - INFO - 4506 - 6242742272 - MedicalAIChatbot initialized successfully
+2024-11-24 15:06:25,716 - __main__ - WARNING - 4506 - 6208516096 - System prompt file not found, using default prompt
+2024-11-24 15:06:25,716 - __main__ - INFO - 4506 - 6208516096 - MedicalAIChatbot initialized successfully
+2024-11-24 15:06:27,035 - __main__ - WARNING - 4506 - 6242742272 - System prompt file not found, using default prompt
+2024-11-24 15:06:27,035 - __main__ - INFO - 4506 - 6242742272 - MedicalAIChatbot initialized successfully
+2024-11-24 15:06:34,478 - __main__ - WARNING - 4506 - 6208516096 - System prompt file not found, using default prompt
+2024-11-24 15:06:34,479 - __main__ - INFO - 4506 - 6208516096 - MedicalAIChatbot initialized successfully
+2024-11-24 15:06:35,296 - httpx - INFO - 4506 - 6208516096 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-24 15:06:44,545 - __main__ - WARNING - 4506 - 6242742272 - System prompt file not found, using default prompt
+2024-11-24 15:06:44,545 - __main__ - INFO - 4506 - 6242742272 - MedicalAIChatbot initialized successfully
+2024-11-24 15:06:45,321 - httpx - INFO - 4506 - 6242742272 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-24 15:06:51,232 - __main__ - WARNING - 4506 - 6208516096 - System prompt file not found, using default prompt
+2024-11-24 15:06:51,233 - __main__ - INFO - 4506 - 6208516096 - MedicalAIChatbot initialized successfully
+2024-11-24 15:09:56,494 - cerebras.cloud.sdk._base_client - INFO - 4571 - 6220017664 - Retrying request to /v1/models in 0.497311 seconds
+2024-11-24 15:09:57,819 - httpx - INFO - 4571 - 6220017664 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:09:58,565 - httpx - INFO - 4571 - 6220017664 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:09:58,839 - httpx - INFO - 4571 - 6220017664 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:09:59,589 - httpx - INFO - 4571 - 6220017664 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:00,332 - httpx - INFO - 4571 - 6220017664 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:00,335 - __main__ - INFO - 4571 - 6220017664 - System prompt loaded successfully
+2024-11-24 15:10:00,335 - __main__ - INFO - 4571 - 6220017664 - MedicalAIChatbot initialized successfully
+2024-11-24 15:10:04,508 - httpx - INFO - 4571 - 6254243840 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:04,778 - httpx - INFO - 4571 - 6254243840 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:05,045 - httpx - INFO - 4571 - 6254243840 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:05,773 - httpx - INFO - 4571 - 6254243840 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:06,045 - httpx - INFO - 4571 - 6254243840 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:06,048 - __main__ - INFO - 4571 - 6254243840 - System prompt loaded successfully
+2024-11-24 15:10:06,048 - __main__ - INFO - 4571 - 6254243840 - MedicalAIChatbot initialized successfully
+2024-11-24 15:10:08,422 - httpx - INFO - 4571 - 6220017664 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:08,688 - httpx - INFO - 4571 - 6220017664 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:09,010 - httpx - INFO - 4571 - 6220017664 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:09,272 - httpx - INFO - 4571 - 6220017664 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:09,537 - httpx - INFO - 4571 - 6220017664 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:09,538 - __main__ - INFO - 4571 - 6220017664 - System prompt loaded successfully
+2024-11-24 15:10:09,538 - __main__ - INFO - 4571 - 6220017664 - MedicalAIChatbot initialized successfully
+2024-11-24 15:10:20,200 - httpx - INFO - 4571 - 6254243840 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:20,470 - httpx - INFO - 4571 - 6254243840 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:21,198 - httpx - INFO - 4571 - 6254243840 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:21,504 - httpx - INFO - 4571 - 6254243840 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:21,807 - httpx - INFO - 4571 - 6254243840 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:21,809 - __main__ - INFO - 4571 - 6254243840 - System prompt loaded successfully
+2024-11-24 15:10:21,809 - __main__ - INFO - 4571 - 6254243840 - MedicalAIChatbot initialized successfully
+2024-11-24 15:10:22,606 - httpx - INFO - 4571 - 6254243840 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-24 15:10:29,799 - httpx - INFO - 4571 - 6254243840 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-24 15:10:32,520 - httpx - INFO - 4571 - 6220017664 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:32,789 - httpx - INFO - 4571 - 6220017664 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:33,075 - httpx - INFO - 4571 - 6220017664 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:33,341 - httpx - INFO - 4571 - 6220017664 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:33,690 - httpx - INFO - 4571 - 6220017664 - HTTP Request: GET https://api.cerebras.ai/v1/models "HTTP/1.1 200 OK"
+2024-11-24 15:10:33,691 - __main__ - INFO - 4571 - 6220017664 - System prompt loaded successfully
+2024-11-24 15:10:33,691 - __main__ - INFO - 4571 - 6220017664 - MedicalAIChatbot initialized successfully
+2024-11-24 15:10:34,510 - httpx - INFO - 4571 - 6220017664 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-24 15:10:41,837 - httpx - INFO - 4571 - 6220017664 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-24 15:14:09,617 - __main__ - INFO - 4626 - 6184054784 - System prompt loaded successfully
+2024-11-24 15:14:09,618 - __main__ - INFO - 4626 - 6184054784 - MedicalAIChatbot initialized successfully
+2024-11-24 15:14:14,311 - __main__ - INFO - 4626 - 6218280960 - System prompt loaded successfully
+2024-11-24 15:14:14,311 - __main__ - INFO - 4626 - 6218280960 - MedicalAIChatbot initialized successfully
+2024-11-24 15:14:14,954 - httpx - INFO - 4626 - 6218280960 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-24 15:14:16,824 - httpx - INFO - 4626 - 6218280960 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"

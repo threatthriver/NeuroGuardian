@@ -21,6 +21,7 @@ import bleach
 import secrets
 from functools import wraps
 import time
+import re
 
 # Configure logging with more detailed format
 logging.basicConfig(
@@ -608,18 +609,104 @@ class DoctorManager:
             logger.error(f"Failed to load doctor records: {str(e)}")
             return {}
 
+def format_markdown_content(content: str) -> str:
+    """Format content with enhanced markdown support."""
+    # Add support for medical terminology highlighting
+    content = re.sub(r'\b(diagnosis|treatment|symptoms?|medication)\b', r'**\1**', content, flags=re.IGNORECASE)
+    
+    # Format medical measurements
+    content = re.sub(r'(\d+)\s*(mg|ml|g|kg|mm\s*Hg)', r'`\1 \2`', content)
+    
+    # Format medical references
+    content = re.sub(r'\[(Ref|Reference)\s*:\s*([^\]]+)\]', r'> *\1: \2*', content)
+    
+    return content
+
 def display_message(role: str, content: str, message_id: Optional[str] = None) -> None:
     try:
         role_class = "user-message" if role == "user" else "ai-message"
         avatar = "🧑‍⚕️" if role == "user" else "🤖"
+        
+        # Format the content with enhanced markdown
+        formatted_content = format_markdown_content(content)
+        
         with st.chat_message(role, avatar=avatar):
-            st.markdown(f'<div class="{role_class}">{content}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'''
+                <div class="{role_class}">
+                    <div class="message-content">
+                        {formatted_content}
+                    </div>
+                    {f'<div class="message-id">{message_id}</div>' if message_id else ''}
+                </div>
+                ''',
+                unsafe_allow_html=True
+            )
+            
     except Exception as e:
         logger.error(f"Failed to display message: {str(e)}")
         st.error("Failed to display message")
 
 def chat_page(chatbot: MedicalAIChatbot):
     try:
+        # Add custom CSS for better markdown rendering
+        st.markdown("""
+            <style>
+                .chat-header {
+                    background: linear-gradient(135deg, #1e3c72, #2a5298);
+                    padding: 20px;
+                    border-radius: 10px;
+                    color: white;
+                    margin-bottom: 20px;
+                }
+                .chat-header h2 {
+                    margin: 0;
+                    font-size: 24px;
+                }
+                .message-content {
+                    font-size: 16px;
+                    line-height: 1.6;
+                }
+                .message-content code {
+                    background-color: #f0f2f5;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    font-family: 'Courier New', monospace;
+                }
+                .message-content blockquote {
+                    border-left: 3px solid #2a5298;
+                    margin: 10px 0;
+                    padding-left: 15px;
+                    color: #666;
+                }
+                .ai-message {
+                    background-color: #f8f9fa;
+                    border-radius: 10px;
+                    padding: 15px;
+                    margin: 10px 0;
+                }
+                .user-message {
+                    background-color: #e3f2fd;
+                    border-radius: 10px;
+                    padding: 15px;
+                    margin: 10px 0;
+                }
+                .disclaimer {
+                    background-color: #fff3cd;
+                    border-left: 4px solid #ffc107;
+                    padding: 15px;
+                    margin-top: 30px;
+                    border-radius: 4px;
+                }
+                .medical-summary {
+                    background-color: #e8f5e9;
+                    border-radius: 8px;
+                    padding: 15px;
+                    margin: 10px 0;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+
         st.markdown("""
             <div class="chat-header">
                 <h2>🧠 NeuroGuardian Medical Assistant</h2>
@@ -633,16 +720,14 @@ def chat_page(chatbot: MedicalAIChatbot):
 
         # Display chat messages
         for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+            display_message(message["role"], message["content"], message.get("id"))
 
         # Chat input
         if prompt := st.chat_input("Ask me about any medical concerns..."):
             # Add user message to chat history
             st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.markdown(prompt)
-
+            display_message("user", prompt)
+            
             # Get AI response
             with st.chat_message("assistant"):
                 message_placeholder = st.empty()
@@ -669,21 +754,22 @@ def chat_page(chatbot: MedicalAIChatbot):
                         # Display relevant medical information if available
                         if any(analysis.values()):
                             with st.expander("📋 Medical Summary"):
+                                st.markdown('<div class="medical-summary">', unsafe_allow_html=True)
                                 if analysis.get("conditions"):
-                                    st.markdown("**Conditions:**")
+                                    st.markdown("### 🏥 Conditions")
                                     for condition in analysis["conditions"]:
-                                        st.markdown(f"• {condition}")
+                                        st.markdown(f"* **{condition}**")
                                 
                                 if analysis.get("medications"):
-                                    st.markdown("**Medications:**")
+                                    st.markdown("### 💊 Medications")
                                     for med in analysis["medications"]:
-                                        st.markdown(f"• {med}")
+                                        st.markdown(f"* `{med}`")
                                 
                                 if analysis.get("recommendations"):
-                                    st.markdown("**Recommendations:**")
+                                    st.markdown("### 📋 Recommendations")
                                     for rec in analysis["recommendations"]:
-                                        st.markdown(f"• {rec}")
-                        
+                                        st.markdown(f"* _{rec}_")
+                                st.markdown('</div>', unsafe_allow_html=True)
                     except Exception as e:
                         error_msg = "I apologize, but I encountered an error. Please try rephrasing your question."
                         message_placeholder.error(error_msg)

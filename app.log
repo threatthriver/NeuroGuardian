@@ -971,3 +971,9 @@ Environment variables loaded successfully
 2024-11-25 21:38:28,903 - __main__ - INFO - 24322 - 6185824256 - MedicalAIChatbot initialized successfully
 2024-11-25 21:38:29,561 - httpx - INFO - 24322 - 6185824256 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
 2024-11-25 21:38:31,204 - httpx - INFO - 24322 - 6185824256 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-25 21:38:54,438 - __main__ - INFO - 24322 - 6151598080 - System prompt loaded successfully
+2024-11-25 21:38:54,439 - __main__ - INFO - 24322 - 6151598080 - MedicalAIChatbot initialized successfully
+2024-11-25 21:39:11,106 - __main__ - INFO - 24322 - 6185824256 - System prompt loaded successfully
+2024-11-25 21:39:11,106 - __main__ - INFO - 24322 - 6185824256 - MedicalAIChatbot initialized successfully
+2024-11-25 21:39:13,502 - httpx - INFO - 24322 - 6185824256 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-25 21:39:19,379 - httpx - INFO - 24322 - 6185824256 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"

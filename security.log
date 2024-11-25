@@ -69,3 +69,11 @@
 2024-11-24 15:14:14,311 - __main__ - INFO - 4626 - 6218280960 - MedicalAIChatbot initialized successfully
 2024-11-24 15:14:14,954 - httpx - INFO - 4626 - 6218280960 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
 2024-11-24 15:14:16,824 - httpx - INFO - 4626 - 6218280960 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-25 21:38:11,562 - __main__ - INFO - 24290 - 8520185920 - System prompt loaded successfully
+2024-11-25 21:38:11,563 - __main__ - INFO - 24290 - 8520185920 - MedicalAIChatbot initialized successfully
+2024-11-25 21:38:23,320 - __main__ - INFO - 24322 - 6151598080 - System prompt loaded successfully
+2024-11-25 21:38:23,320 - __main__ - INFO - 24322 - 6151598080 - MedicalAIChatbot initialized successfully
+2024-11-25 21:38:28,903 - __main__ - INFO - 24322 - 6185824256 - System prompt loaded successfully
+2024-11-25 21:38:28,903 - __main__ - INFO - 24322 - 6185824256 - MedicalAIChatbot initialized successfully
+2024-11-25 21:38:29,561 - httpx - INFO - 24322 - 6185824256 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2024-11-25 21:38:31,204 - httpx - INFO - 24322 - 6185824256 - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"

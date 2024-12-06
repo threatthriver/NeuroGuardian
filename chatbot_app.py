@@ -42,6 +42,32 @@ if 'authenticated' not in st.session_state:
 if 'username' not in st.session_state:
     st.session_state.username = None
 
+# Database configuration
+USER_DB_FILE = "data/users.json"
+CHAT_HISTORY_FILE = "data/chat_history.json"
+
+# Ensure data directory exists
+os.makedirs("data", exist_ok=True)
+
+def save_database(filename, data):
+    """Save data to a JSON file"""
+    try:
+        with open(filename, 'w') as f:
+            json.dump(data, f, indent=4)
+    except Exception as e:
+        st.error(f"Error saving data: {str(e)}")
+
+def load_database(filename):
+    """Load data from a JSON file"""
+    try:
+        if os.path.exists(filename):
+            with open(filename, 'r') as f:
+                return json.load(f)
+        return {}
+    except Exception as e:
+        st.error(f"Error loading data: {str(e)}")
+        return {}
+
 # Initialize Cerebras client
 @st.cache_resource
 def get_cerebras_client():
@@ -60,48 +86,90 @@ st.set_page_config(
     }
 )
 
-# Custom CSS for better UI
+# Custom CSS for dark mode compatibility
 st.markdown("""
 <style>
+    /* Base styles */
     .main {
         padding: 2rem;
     }
+    
+    /* Button styles */
     .stButton>button {
         width: 100%;
         border-radius: 20px;
         height: 3em;
-        background-color: #4CAF50;
+        background-color: var(--primary-color);
         color: white;
         border: none;
         transition: all 0.3s ease;
     }
     .stButton>button:hover {
-        background-color: #45a049;
+        opacity: 0.8;
         transform: translateY(-2px);
     }
+    
+    /* Chat message styles */
     .chat-message {
         padding: 1.5rem;
         border-radius: 15px;
         margin-bottom: 1rem;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        border: 1px solid rgba(250, 250, 250, 0.1);
     }
     .user-message {
-        background-color: #E3F2FD;
+        background-color: rgba(28, 131, 225, 0.1);
     }
     .assistant-message {
-        background-color: #F5F5F5;
+        background-color: rgba(255, 255, 255, 0.05);
     }
+    
+    /* Feature card styles */
     .feature-card {
         padding: 1.5rem;
         border-radius: 15px;
-        background-color: white;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(250, 250, 250, 0.1);
         margin-bottom: 1rem;
         transition: all 0.3s ease;
     }
     .feature-card:hover {
         transform: translateY(-5px);
-        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+    }
+    
+    /* Dark mode specific styles */
+    [data-testid="stSidebar"] {
+        background-color: rgba(0, 0, 0, 0.2);
+    }
+    
+    .user-profile {
+        background-color: rgba(255, 255, 255, 0.05);
+        padding: 1rem;
+        border-radius: 10px;
+        border: 1px solid rgba(250, 250, 250, 0.1);
+    }
+    
+    /* Form styles */
+    [data-testid="stForm"] {
+        background-color: rgba(255, 255, 255, 0.05);
+        padding: 2rem;
+        border-radius: 15px;
+        border: 1px solid rgba(250, 250, 250, 0.1);
+    }
+    
+    /* Input styles */
+    .stTextInput>div>div>input {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(250, 250, 250, 0.1);
+        color: inherit;
+    }
+    
+    /* Metric styles */
+    [data-testid="stMetricValue"] {
+        background-color: rgba(255, 255, 255, 0.05);
+        padding: 0.5rem;
+        border-radius: 5px;
+        border: 1px solid rgba(250, 250, 250, 0.1);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -111,16 +179,6 @@ if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 
 # Load user database
-USER_DB_FILE = "user_db.json"
-CHAT_HISTORY_FILE = "chat_histories.json"
-
-def load_database(filename):
-    if not os.path.exists(filename):
-        with open(filename, 'w') as f:
-            json.dump({}, f)
-    with open(filename, 'r') as f:
-        return json.load(f)
-
 user_db = load_database(USER_DB_FILE)
 chat_histories = load_database(CHAT_HISTORY_FILE)
 
@@ -390,7 +448,7 @@ if st.session_state.authenticated:
         
         # User profile
         st.markdown(f"""
-        <div style='background-color: white; padding: 1rem; border-radius: 10px; margin-bottom: 1rem;'>
+        <div class='user-profile'>
             <h3>👤 {st.session_state.username}</h3>
             <p>Member since: {user_db[st.session_state.username]['created_at'][:10]}</p>
         </div>
@@ -420,22 +478,34 @@ if st.session_state.authenticated:
         
         # Analytics
         st.subheader("📊 Chat Analytics")
-        total_messages = st.session_state.chat_analytics['total_messages']
-        user_messages = st.session_state.chat_analytics['user_messages']
-        ai_messages = st.session_state.chat_analytics['ai_messages']
+        
+        # Metrics in a card
+        st.markdown("""
+        <div class='feature-card'>
+        """, unsafe_allow_html=True)
         
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Total Messages", total_messages)
+            st.metric("Messages", st.session_state.chat_analytics['total_messages'])
         with col2:
-            st.metric("Response Time", f"{st.session_state.chat_analytics['average_response_time']:.1f}s")
+            avg_time = st.session_state.chat_analytics['average_response_time']
+            st.metric("Avg. Response", f"{avg_time:.1f}s")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
         
         # Show mood history
         if st.session_state.chat_analytics['mood_tracking']:
+            st.markdown("""
+            <div class='feature-card'>
+                <h4>Mood History</h4>
+            """, unsafe_allow_html=True)
+            
             moods = [m['mood'] for m in st.session_state.chat_analytics['mood_tracking']]
             dates = [m['timestamp'][:10] for m in st.session_state.chat_analytics['mood_tracking']]
             mood_df = pd.DataFrame({'Date': dates, 'Mood': moods})
-            st.line_chart(mood_df.groupby('Date').size())
+            st.line_chart(mood_df.groupby('Date').size(), use_container_width=True)
+            
+            st.markdown("</div>", unsafe_allow_html=True)
         
         # Logout button
         if st.button("🚪 Logout", use_container_width=True):
@@ -446,7 +516,6 @@ if st.session_state.authenticated:
     
     # Main chat area
     st.title("🧠 NeuroGuardian AI Chat")
-    st.markdown("---")
     
     # Emergency support banner
     if chat_mode == "Emergency Support":
@@ -459,10 +528,14 @@ if st.session_state.authenticated:
         - Text HOME to 741741 to connect with a Crisis Counselor
         """)
     
-    # Chat interface
+    # Chat interface with improved styling
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
-            st.write(message["content"])
+            st.markdown(f"""
+            <div class='chat-message {"user-message" if message["role"] == "user" else "assistant-message"}'>
+                {message["content"]}
+            </div>
+            """, unsafe_allow_html=True)
     
     # Chat input
     if prompt := st.chat_input("Type your message here..."):
@@ -480,7 +553,8 @@ if st.session_state.authenticated:
         st.session_state.chat_analytics['ai_messages'] += 1
         st.session_state.chat_analytics['total_messages'] += 1
         st.session_state.chat_analytics['average_response_time'] = (
-            (st.session_state.chat_analytics['average_response_time'] * (st.session_state.chat_analytics['ai_messages'] - 1) + response_time) / 
+            (st.session_state.chat_analytics['average_response_time'] * 
+             (st.session_state.chat_analytics['ai_messages'] - 1) + response_time) / 
             st.session_state.chat_analytics['ai_messages']
         )
         
@@ -488,16 +562,20 @@ if st.session_state.authenticated:
         st.session_state.messages.append({"role": "assistant", "content": response})
         
         # Save chat history
-        chat_histories[st.session_state.username] = {
-            'messages': st.session_state.messages,
-            'analytics': st.session_state.chat_analytics
-        }
-        save_database(CHAT_HISTORY_FILE, chat_histories)
+        if st.session_state.username in chat_histories:
+            chat_histories[st.session_state.username]['messages'] = st.session_state.messages
+            chat_histories[st.session_state.username]['analytics'] = st.session_state.chat_analytics
+        else:
+            chat_histories[st.session_state.username] = {
+                'messages': st.session_state.messages,
+                'analytics': st.session_state.chat_analytics
+            }
         
-        # Rerun to update UI
+        save_database(CHAT_HISTORY_FILE, chat_histories)
         st.rerun()
     
-    # Clear chat button
+    # Clear chat button with custom styling
+    st.markdown("<br>", unsafe_allow_html=True)
     if st.button("🗑️ Clear Chat", use_container_width=True):
         st.session_state.messages = [
             {"role": "assistant", "content": "Hello! I'm NeuroGuardian AI, your mental health companion. How can I assist you today?"}

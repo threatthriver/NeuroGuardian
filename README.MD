@@ -1,48 +1,52 @@
-I've made several significant improvements to the code:
+# NeuroGuardian AI Chat
 
-Better Code Organization:
+A sophisticated AI chatbot built with Streamlit and Cerebras SDK, featuring multiple chat modes, conversation history, and real-time streaming responses.
 
-Created separate classes for different functionalities (ChatManager, GroqClient, FeedbackManager, ImageProcessor)
-Implemented a Config class for better configuration management
-Improved code structure and readability
+## Features
 
+- 💬 Interactive chat interface
+- 🔄 Multiple chat modes (General, Creative, Technical)
+- 📝 Conversation history with timestamps
+- ⚡ Real-time response streaming
+- 🎨 Clean and modern UI
+- 🎛️ Adjustable response parameters
+- 🧹 Clear chat functionality
 
-Enhanced Chat Management:
+## Setup Instructions
 
-Added a sidebar with chat history
-Implemented chat creation, deletion, and switching functionality
-Added persistent chat storage using JSON files
-Each chat has a unique ID and title
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
+3. Create a `.env` file in the project root and add your Cerebras API key:
+   ```
+   CEREBRAS_API_KEY=your_api_key_here
+   ```
 
-Improved UI/UX:
+4. Run the application:
+   ```bash
+   streamlit run chatbot_app.py
+   ```
 
-Used Streamlit's chat interface instead of basic text input/output
-Added proper chat message display with user/assistant roles
-Implemented a cleaner sidebar design
-Added loading states and better error messages
+## Chat Modes
 
+- **General**: Balanced responses suitable for everyday conversation
+- **Creative**: More imaginative and unique perspectives
+- **Technical**: Precise and detailed technical information
 
-Better Error Handling:
+## Requirements
 
-Added comprehensive try-except blocks
-Improved logging with both file and console handlers
-Better error messages for users
-Graceful fallbacks for various failure scenarios
+- Python 3.8+
+- Streamlit
+- Cerebras Cloud SDK
+- Python-dotenv
 
+## Usage
 
-Enhanced Features:
-
-Improved feedback system with JSON storage
-Better email notification system
-Enhanced image processing capabilities
-Added chat history persistence
-Implemented proper session state management
-
-
-Security and Configuration:
-
-Better environment variable handling
-Secure email configuration
-Protected API key handling
-
+1. Select a chat mode from the sidebar
+2. Adjust the response parameters as needed
+3. Type your message in the input field
+4. View the AI's response in real-time
+5. Clear chat history using the sidebar button when needed

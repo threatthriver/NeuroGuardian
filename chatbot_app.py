@@ -126,12 +126,12 @@ def show_landing_page():
     with col1:
         if st.button("Login", use_container_width=True):
             st.session_state.page = 'login'
-            st.experimental_rerun()
+            st.rerun()
     
     with col2:
         if st.button("Register", use_container_width=True):
             st.session_state.page = 'register'
-            st.experimental_rerun()
+            st.rerun()
     
     # About section
     st.write("---")
@@ -156,7 +156,7 @@ def show_login_page():
     with col1:
         if st.button("Back to Home"):
             st.session_state.page = 'landing'
-            st.experimental_rerun()
+            st.rerun()
     
     with col2:
         if st.button("Login"):
@@ -165,14 +165,14 @@ def show_login_page():
                 st.session_state.username = login_username
                 st.success("Login successful!")
                 time.sleep(1)
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("Invalid credentials")
     
     with col3:
         if st.button("Need an account?"):
             st.session_state.page = 'register'
-            st.experimental_rerun()
+            st.rerun()
 
 # Register page
 def show_register_page():
@@ -188,7 +188,7 @@ def show_register_page():
     with col1:
         if st.button("Back to Home"):
             st.session_state.page = 'landing'
-            st.experimental_rerun()
+            st.rerun()
     
     with col2:
         if st.button("Register"):
@@ -205,12 +205,12 @@ def show_register_page():
                 st.success("Registration successful!")
                 time.sleep(1)
                 st.session_state.page = 'login'
-                st.experimental_rerun()
+                st.rerun()
     
     with col3:
         if st.button("Already have an account?"):
             st.session_state.page = 'login'
-            st.experimental_rerun()
+            st.rerun()
 
 # Main application logic
 if not st.session_state.authenticated:
@@ -268,7 +268,7 @@ if st.session_state.authenticated:
             st.session_state.messages = [
                 {"role": "assistant", "content": "Hello! I'm NeuroGuardian AI, your mental health companion. How can I assist you today?"}
             ]
-            st.experimental_rerun()
+            st.rerun()
     
     # Chat interface
     for message in st.session_state.messages:
